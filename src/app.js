@@ -15,6 +15,8 @@ const authRoutes = require('./routes/authRoutes');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const uploadPhotosRoutes = require("./routes/uploadPhotosRoutes");
 const modifyProfileRoutes = require('./routes/modifyProfileRoutes');
+const motherTongueRoutes = require("./routes/motherTongueRoutes");
+const nativePlaceRoutes = require("./routes/nativePlaceRoutes"); // Add this line
 const path = require('path');
 // const paymentRoutes = require('./routes/paymentRoutes'); // Import payment routes
 require("dotenv").config();
@@ -47,7 +49,9 @@ app.use("/api", uploadPhotosRoutes);
 app.use("/api", contactDetailsRoutes); // Add this line
 app.use('/test', testRoutes);
 app.use('/api', modifyProfileRoutes);
+app.use("/api", nativePlaceRoutes); // Add this line
 //app.use('/api', paymentRoutes); // Use the payment routes
+app.use("/api", motherTongueRoutes);
 
 console.log('Contact Details routes mounted under /api'); // Add this log
 
