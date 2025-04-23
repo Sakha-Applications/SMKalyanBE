@@ -1,37 +1,41 @@
-//**2.1 Model (`uploadPhotosModel.js`)**
 const pool = require("../config/db"); // Adjust the path to your database connection pool
+console.log("Debug (Model): Imported pool object:", pool);
 
 const savePhotoPath = async (profileId, email, photoPath, filename, isDefault) => {
+    let connection;
     try {
-        // Start a transaction to ensure data consistency
-        await pool.beginTransaction();
+        connection = await pool.getConnection(); // Get a connection from the pool
+        await connection.beginTransaction(); // Start a transaction
 
         // If this is the default photo, set any existing default photo to false
         if (isDefault) {
             const updateDefaultQuery = "UPDATE profile_photos SET is_default = FALSE WHERE profile_id = ?";
-            await pool.execute(updateDefaultQuery, [profileId]);
+            await connection.execute(updateDefaultQuery, [profileId]);
         }
 
         const query = "INSERT INTO profile_photos (profile_id, email, photo_path, filename, is_default) VALUES (?, ?, ?, ?, ?)";
         const values = [profileId, email, photoPath, filename, isDefault];
-        const [result] = await pool.execute(query, values);
+        const [result] = await connection.execute(query, values);
         const insertId = result.insertId;
 
-         // Commit the transaction
-        await pool.commit();
+        await connection.commit(); // Commit the transaction
         return insertId;
     } catch (error) {
-        // Rollback the transaction in case of an error
-        await pool.rollback();
+        if (connection) {
+            await connection.rollback(); // Rollback the transaction in case of an error
+        }
         console.error("Error saving photo path:", error);
         throw error;
+    } finally {
+        if (connection) {
+            connection.release(); // Release the connection back to the pool
+        }
     }
 };
 
 const getPhotosByProfileId = async (profileId) => {
     try {
-        const query = "SELECT photo_path, filename, is_default FROM profile_photos WHERE profile_id = ?";
-        const [rows] = await pool.execute(query, [profileId]);
+        const [rows] = await pool.execute("SELECT photo_path, filename, is_default FROM profile_photos WHERE profile_id = ?", [profileId]);
         return rows;
     } catch (error) {
         console.error("Error retrieving photos:", error);
@@ -40,20 +44,18 @@ const getPhotosByProfileId = async (profileId) => {
 };
 
 const getPhotosByEmail = async (email) => {
-  try {
-      const query = "SELECT photo_path, filename, is_default FROM profile_photos WHERE email = ?";
-      const [rows] = await pool.execute(query, [email]);
-      return rows;
-  } catch (error) {
-      console.error("Error retrieving photos by email:", error);
-      throw error;
-  }
+    try {
+        const [rows] = await pool.execute("SELECT photo_path, filename, is_default FROM profile_photos WHERE email = ?", [email]);
+        return rows;
+    } catch (error) {
+        console.error("Error retrieving photos by email:", error);
+        throw error;
+    }
 };
 
 const getDefaultPhoto = async (profileId) => {
     try {
-        const query = "SELECT photo_path, filename FROM profile_photos WHERE profile_id = ? AND is_default = TRUE";
-        const [rows] = await pool.execute(query, [profileId]);
+        const [rows] = await pool.execute("SELECT photo_path, filename FROM profile_photos WHERE profile_id = ? AND is_default = TRUE", [profileId]);
         return rows[0]; // Returns the first row, or undefined if no default
     } catch (error) {
         console.error("Error retrieving default photo:", error);

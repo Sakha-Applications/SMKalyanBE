@@ -2,7 +2,8 @@ const pool = require("../config/db");
 console.log("✅ uploadSearchModel.js loaded");
 
 const findProfilesForUpload = async (searchCriteria) => {
-    let query = `SELECT id, name, current_age, gotra FROM profile WHERE 1=1`;
+    console.log("Backend Model: findProfilesForUpload called with:", searchCriteria); // Added log
+    let query = `SELECT profile_id AS profileId, name, current_age, gotra, email FROM profile WHERE 1=1`;
     const values = [];
     const { profileId, email, phone } = searchCriteria; // Extract properties from the input object
 

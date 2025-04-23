@@ -1,5 +1,7 @@
+// controllers/profileController.js
 const { createProfile, fetchAllProfiles } = require("../models/profileModel");
 const axios = require('axios'); // Import axios to make HTTP requests
+const { sendEmailReport } = require("../services/emailService"); // Import the email service
 
 // Add a new profile
 const addProfile = async (req, res) => {
@@ -35,12 +37,62 @@ const addProfile = async (req, res) => {
                     console.log("✅ User login details inserted successfully:", userLoginResponse.data);
                     userLoginResponseData = userLoginResponse.data;
                     console.log("➡️ Before successful response:", calculatedProfileId); // Debug
-                    return res.status(201).json({
-                        message: "Profile and user login created successfully",
-                        profileId: calculatedProfileId, // Send back the generated profileId
-                        userId: userLoginResponseData?.userId,
-                        password: userLoginData.password // Include the password in the response
-                    });
+
+                    // 3. Construct and send the email
+                    const emailSubject = 'Congratulations! Successful Registration';
+                    const emailHtmlContent = `
+                        <html>
+                        <head>
+                            <style>
+                                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                                h2 { color: #007bff; }
+                                strong { font-weight: bold; }
+                                .note { color: #dc3545; font-weight: bold; }
+                                .signature { margin-top: 20px; font-style: italic; }
+                            </style>
+                        </head>
+                        <body>
+                            <h2>Congratulations!!!!!</h2>
+                            <p>You have been successfully registered.</p>
+                            <p>The details of your log in and password have been e-mailed to your registered e-mail ID:</p>
+                            <p><strong>Email ID:</strong> ${profileData.email}</p>
+                            <p><strong>User ID:</strong> ${userLoginResponseData?.userId}</p>
+                            <p><strong>Password:</strong> ${userLoginData.password}</p>
+                            <p class="note">Note: To access "contact" details, the subscription charges are Rs 1000 per annum. The validity for log in if you are a "subscribed member" will start from today for a period of 365 days.</p>
+                            <div class="signature">
+                                <p>Thanks / Best wishes</p>
+                                <p>Kalyana Sakha</p>
+                            </div>
+                        </body>
+                        </html>
+                    `;
+
+                    const mailOptions = {
+                        from: process.env.EMAIL_FROM || '"Kalyana Sakha" <smkalyanasakha@gmail.com>',
+                        to: profileData.email,
+                        subject: emailSubject,
+                        html: emailHtmlContent
+                    };
+
+                    try {
+                        const emailResult = await sendEmailReport(mailOptions);
+                        console.log('📧 Email sent successfully:', emailResult);
+                        return res.status(201).json({
+                            message: "Profile and user login created successfully, confirmation email sent",
+                            profileId: calculatedProfileId,
+                            userId: userLoginResponseData?.userId,
+                            password: userLoginData.password
+                        });
+                    } catch (emailError) {
+                        console.error("❌ Error sending email:", emailError);
+                        return res.status(201).json({ // Still indicate profile creation success
+                            message: "Profile and user login created successfully, but failed to send confirmation email",
+                            profileId: calculatedProfileId,
+                            userId: userLoginResponseData?.userId,
+                            password: userLoginData.password,
+                            emailError: emailError.message
+                        });
+                    }
 
                 } catch (userLoginError) {
                     console.error("❌ Error creating user login via API:", userLoginError);

@@ -10,7 +10,7 @@ const createProfile = async (formData) => {
     communicationAddress, residenceAddress, fatherName, fatherProfession,
     motherName, motherProfession, expectations, siblings,
     workingStatus, education, profession, designation,
-    currentCompany, annualIncome
+    currentCompany, profileCategory,profileCategoryneed, annualIncome
   } = formData;
 
   console.log("🟡 Preparing to insert profile data into Azure MySQL DB");
@@ -23,7 +23,7 @@ const createProfile = async (formData) => {
     communicationAddress, residenceAddress, fatherName, fatherProfession,
     motherName, motherProfession, expectations, siblings,
     workingStatus, education, profession, designation,
-    currentCompany, annualIncome
+    currentCompany,profileCategory,profileCategoryneed, annualIncome
   ]);
 
   const query = `
@@ -35,7 +35,7 @@ const createProfile = async (formData) => {
       communication_address, residence_address, father_name, father_profession,
       mother_name, mother_profession, expectations, siblings,
       working_status, education, profession, designation,
-      current_company, annual_income, created_at
+      current_company, profile_category, profile_category_need,annual_income, created_at
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?, ?,
@@ -43,7 +43,7 @@ const createProfile = async (formData) => {
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?,
-      ?,  NOW()
+      ?, ?, ?,  NOW()
     )
   `;
 
@@ -55,7 +55,7 @@ const createProfile = async (formData) => {
     communicationAddress, residenceAddress, fatherName, fatherProfession,
     motherName, motherProfession, expectations, siblings,
     workingStatus, education, profession, designation,
-    currentCompany, annualIncome
+    currentCompany, profileCategory,profileCategoryneed, annualIncome
   ];
 
   try {

@@ -8,7 +8,9 @@ const searchProfilesForUpload = async (req, res) => {
   try {
     const { profileId, email, phone } = req.body;
     const results = await uploadSearchModel.findProfilesForUpload({ profileId, email, phone });
+    console.log("Backend Controller: Search Results:", results); // Added log
     res.json(results);
+    
   } catch (error) {
     console.error("❌ Error searching profiles for upload:", error);
     res.status(500).json({ error: "Internal Server Error" });
