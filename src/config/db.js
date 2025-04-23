@@ -1,3 +1,4 @@
+//db.js
 const mysql = require('mysql2/promise'); // Ensure you're using the promise API
 require('dotenv').config();
 
