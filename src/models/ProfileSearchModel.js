@@ -8,6 +8,7 @@ const searchProfiles = async (profileFor, minAge, maxAge, gotra) => {
         let query = `SELECT * FROM profile WHERE 1=1`;
         let values = [];
 
+       
         if (profileFor) {
             query += ` AND profile_for = ?`;
             values.push(`${profileFor}`);
