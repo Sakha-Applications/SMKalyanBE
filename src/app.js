@@ -18,6 +18,16 @@ const modifyProfileRoutes = require('./routes/modifyProfileRoutes');
 const motherTongueRoutes = require("./routes/motherTongueRoutes");
 const nativePlaceRoutes = require("./routes/nativePlaceRoutes"); // Add this line
 const path = require('path');
+// Import the profession routes
+const professionRoutes = require("./routes/professionRoutes");
+
+// In your main server file (e.g., server.js or index.js)
+const designationRoutes = require("./routes/designationRoutes");
+
+const educationRoutes = require('./routes/educationRoutes'); // Adjust the path if needed
+
+
+const guruMathaRoutes = require("./routes/guruMathaRoutes");
 // const paymentRoutes = require('./routes/paymentRoutes'); // Import payment routes
 require("dotenv").config();
 
@@ -52,6 +62,17 @@ app.use('/api', modifyProfileRoutes);
 app.use("/api", nativePlaceRoutes); // Add this line
 //app.use('/api', paymentRoutes); // Use the payment routes
 app.use("/api", motherTongueRoutes);
+// Add this line with your other app.use statements
+app.use("/api", guruMathaRoutes);
+
+// Use the profession routes
+app.use("/api", professionRoutes);
+
+// Add this with your other route usages
+app.use("/api", designationRoutes);
+
+app.use('/api', educationRoutes);
+
 
 console.log('Contact Details routes mounted under /api'); // Add this log
 
