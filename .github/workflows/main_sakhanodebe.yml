@@ -28,7 +28,7 @@ jobs:
           npm install
           
           npm run build --if-present
-          npm rebuild bcrypt --build-from-source
+          
           rm -rf node_modules/
           npm update
           
