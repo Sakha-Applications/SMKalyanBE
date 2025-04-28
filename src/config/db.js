@@ -11,7 +11,7 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    // ssl: { // You might need to configure SSL properly if your database requires it
+    ssl: false
     //     rejectUnauthorized: true         // Optional: depends on your Azure settings
     // }
 });
