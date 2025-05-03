@@ -27,6 +27,8 @@ jobs:
         run: |
           npm install
           npm run build --if-present
+          rm -rf node_modules/
+          npm update
 
 
       - name: Zip artifact for deployment
