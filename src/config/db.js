@@ -15,7 +15,10 @@ const pool = mysql.createPool({
     //     rejectUnauthorized: true         // Optional: depends on your Azure settings
     // }
 });
-
+console.log(" Host for DB is");
+ console.log(process.env.DB_HOST);
+console.log("DB Name is ");
+console.log(process.env.DB_NAME);
 console.log("✅ Database pool created");
 
 module.exports = pool; // Export the pool directly
