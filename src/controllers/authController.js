@@ -75,7 +75,7 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
     // Authentication successful, generate a token
-    const token = jwt.sign({ userId: user.user_id }, 'your-secret-key', { expiresIn: '1h' }); // Replace 'your-secret-key' with a strong, secret key
+    const token = jwt.sign({ userId: user.user_id }, 'your-secret-key', { expiresIn: '8h' }); // Replace 'your-secret-key' with a strong, secret key
 
     // Include user data in the response
     console.log("Sending login success response:", { token, user });  // DEBUG
