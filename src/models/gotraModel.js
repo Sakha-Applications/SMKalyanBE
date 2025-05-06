@@ -3,7 +3,8 @@ const pool = require("../config/db"); // This should already be set up using mys
 // Fetch Gotra List
 const getGotraList = async () => {
   try {
-    const [rows] = await pool.query("SELECT * FROM tblGotra ORDER BY GotraName ASC");
+    
+    const [rows] = await pool.query("SELECT * FROM userdb.tblGotra ORDER BY GotraName ASC");
     console.log("Gotra List fetched:", rows); // ✅ Debug log
     return rows;
   } catch (error) {
