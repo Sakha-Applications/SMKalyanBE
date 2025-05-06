@@ -1,7 +1,7 @@
 # Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
 # More GitHub Actions for Azure: https://github.com/Azure/actions
 
-name: Build and deploy Node.js app to Azure Web App - SakhaBackEnd
+name: Build and deploy Node.js app to Azure Web App - SakhaSVC
 
 on:
   push:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     permissions:
       contents: read #This is required for actions/checkout
 
@@ -21,19 +21,24 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: '22.x'
 
       - name: npm install, build, and test
         run: |
           npm install
           npm run build --if-present
-         
-      
+          rm -rf node_modules/
+          npm update
+
+
+      - name: Zip artifact for deployment
+        run: zip release.zip ./* -r
+
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: node-app
-          path: .
+          path: release.zip
 
   deploy:
     runs-on: ubuntu-latest
@@ -50,19 +55,22 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: node-app
+
+      - name: Unzip artifact for deployment
+        run: unzip release.zip
       
       - name: Login to Azure
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_92228F04520E404BAF86B7AAC75C8FCE }}
-          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_C234A00908554F03B656011651DB46FE }}
-          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_550C7314AC654F4DB125BBBDA3A70051 }}
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_791530956D9C4BE5AB4431DFD68E0422 }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_242097512EEC4954B1F2F686E8B0092D }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_40B4E6035B924543A9220F9F841C7400 }}
 
       - name: 'Deploy to Azure Web App'
-        uses: azure/webapps-deploy@v3
         id: deploy-to-webapp
+        uses: azure/webapps-deploy@v3
         with:
-          app-name: 'SakhaBackEnd'
+          app-name: 'SakhaSVC'
           slot-name: 'Production'
           package: .
           

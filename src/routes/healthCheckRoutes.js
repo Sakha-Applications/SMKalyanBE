@@ -2,7 +2,7 @@
 //healthcheck js
 const express = require("express");
 const router = express.Router({});
-router.get('/', async (_req, res, _next) => {
+router.get('/healthcheck', async (_req, res, _next) => {
 
     const healthcheck = {
         uptime: process.uptime(),
