@@ -1,10 +1,20 @@
-//**2.2 Controller (`uploadPhotosController.js`)**
 const uploadPhotosModel = require("../models/uploadPhotosModel");
 const path = require("path");
 const fs = require("fs");
 
-const UPLOAD_DIR = "D:\\1. Data\\1. Personal DOcument\\Self Study\\NewGenApp\\SMKalyanUI\\ProfilePhotos";
+// Define upload directory relative to the project root
+// IMPORTANT: This should match the directory configured for static file serving in Express
+const UPLOAD_DIR = path.join(__dirname, '../../../SMKalyanUI/profilePhotos');
+console.log(`Upload directory configured as: ${UPLOAD_DIR}`);
 
+// Log the absolute path for debugging
+console.log(`Absolute path of upload directory: ${path.resolve(UPLOAD_DIR)}`);
+
+// Create uploads directory if it doesn't exist
+if (!fs.existsSync(UPLOAD_DIR)) {
+    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+    console.log(`Created uploads directory at: ${UPLOAD_DIR}`);
+}
 
 const uploadPhotos = async (req, res) => {
     console.log("Debug (Controller): uploadPhotos controller function called");
@@ -46,10 +56,15 @@ const uploadPhotos = async (req, res) => {
                 const originalFilename = file.name;
                 const uniqueFilename = `${profile_id}-${Date.now()}-${originalFilename}`;
                 const filePath = path.join(UPLOAD_DIR, uniqueFilename);
+                
+                // IMPORTANT: This relative path must match how Express serves the files
+                // If Express serves from '/profilePhotos', this should be '/profilePhotos/filename'
+                const relativePath = `${uniqueFilename}`;
 
                 console.log('Debug (Controller): Processing file:', originalFilename);
                 console.log('Debug (Controller): Temporary file path:', file.tempFilePath);
                 console.log('Debug (Controller): New file path:', filePath);
+                console.log('Debug (Controller): Relative path for URL:', relativePath);
 
                 fs.rename(file.tempFilePath, filePath, async (err) => {
                     if (err) {
@@ -61,14 +76,22 @@ const uploadPhotos = async (req, res) => {
                     console.log('Debug (Controller): File successfully moved to:', filePath);
 
                     try {
+                        // Store the file path and relative URL path in the database
                         const photoId = await uploadPhotosModel.savePhotoPath(
                             profile_id,
                             email,
-                            filePath,
-                            uniqueFilename,
+                            filePath,  // Full path for system reference
+                            relativePath,  // Relative path for URL construction
                             isDefault
                         );
-                        savedPhotoPaths.push({ photoId, filePath, originalFilename, isDefault });
+                        
+                        savedPhotoPaths.push({ 
+                            photoId, 
+                            filePath,      // Full path (not exposed to frontend)
+                            relativePath,  // URL path for frontend access
+                            originalFilename, 
+                            isDefault 
+                        });
                         console.log('Debug (Controller): Photo details saved to database with ID:', photoId);
                         resolve();
                     } catch (error) {
@@ -80,7 +103,7 @@ const uploadPhotos = async (req, res) => {
         }));
 
         // Send response after all files have been processed
-        console.log('Debug (Controller): All files processed. Sending success response:', { message: "Photos uploaded successfully.", photos: savedPhotoPaths });
+        console.log('Debug (Controller): All files processed. Sending success response');
         res.json({
             message: "Photos uploaded successfully.",
             photos: savedPhotoPaths
@@ -104,13 +127,36 @@ const getPhotos = async (req, res) => {
         if (profileId) {
             console.log('Debug (Controller): Fetching photos by profile ID:', profileId);
             const photos = await uploadPhotosModel.getPhotosByProfileId(profileId);
-            console.log('Debug (Controller): Photos found:', photos);
-            res.json(photos);
+            
+            // IMPORTANT: Ensure URL paths are consistent with static file serving config
+            const processedPhotos = photos.map(photo => {
+                // Extract just the filename
+                const filename = path.basename(photo.photo_path);
+                
+                return {
+                    ...photo,
+                    // Use the stored URL path if available, otherwise construct it
+                    url: photo.url_path || `/profilePhotos/${filename}`
+                };
+            });
+            
+            console.log('Debug (Controller): Photos found and processed:', processedPhotos);
+            res.json(processedPhotos);
         } else if (email) {
             console.log('Debug (Controller): Fetching photos by email:', email);
             const photos = await uploadPhotosModel.getPhotosByEmail(email);
-            console.log('Debug (Controller): Photos found:', photos);
-            res.json(photos);
+            
+            // Process photos the same way
+            const processedPhotos = photos.map(photo => {
+                const filename = path.basename(photo.photo_path);
+                return {
+                    ...photo,
+                    url: photo.url_path || `/profilePhotos/${filename}`
+                };
+            });
+            
+            console.log('Debug (Controller): Photos found and processed:', processedPhotos);
+            res.json(processedPhotos);
         } else {
             console.log("Debug (Controller): Profile ID or Email is missing in the query.");
             return res.status(400).json({ error: "Profile ID or Email is required" });
@@ -132,9 +178,18 @@ const getDefaultPhoto = async (req, res) => {
         }
         console.log('Debug (Controller): Fetching default photo for profile ID:', profileId);
         const defaultPhoto = await uploadPhotosModel.getDefaultPhoto(profileId);
-        console.log('Debug (Controller): Default photo found:', defaultPhoto);
+        
         if (defaultPhoto) {
-            res.json(defaultPhoto);
+            // Process the default photo URL
+            const filename = path.basename(defaultPhoto.photo_path);
+            const processedPhoto = {
+                ...defaultPhoto,
+                url: defaultPhoto.url_path || `/profilePhotos/${filename}`,
+                filename: filename
+            };
+            
+            console.log('Debug (Controller): Default photo found and processed:', processedPhoto);
+            res.json(processedPhoto);
         } else {
             console.log("Debug (Controller): No default photo found for profile ID:", profileId);
             res.status(404).json({ message: "No default photo found for this profile." });
@@ -145,4 +200,91 @@ const getDefaultPhoto = async (req, res) => {
     }
 };
 
-module.exports = { uploadPhotos, getPhotos, getDefaultPhoto };
+// Route to delete photos
+const deletePhoto = async (req, res) => {
+    console.log("Debug (Controller): deletePhoto controller function called");
+    try {
+        const { photoId } = req.query;
+        
+        if (!photoId) {
+            console.log("Debug (Controller): Photo ID is missing in the query.");
+            return res.status(400).json({ error: "Photo ID is required." });
+        }
+        
+        // Get the photo details from the database
+        const photo = await uploadPhotosModel.getPhotoById(photoId);
+        
+        if (!photo) {
+            console.log("Debug (Controller): Photo not found for ID:", photoId);
+            return res.status(404).json({ error: "Photo not found." });
+        }
+        
+        // Delete the file from the filesystem
+        fs.unlink(photo.photo_path, async (err) => {
+            if (err) {
+                console.error("Debug (Controller): Error deleting file:", err);
+                return res.status(500).json({ error: "Failed to delete photo file.", details: err.message });
+            }
+            
+            // Remove the record from the database
+            await uploadPhotosModel.deletePhoto(photoId);
+            
+            console.log('Debug (Controller): Photo successfully deleted:', photoId);
+            res.json({ message: "Photo deleted successfully." });
+        });
+    } catch (error) {
+        console.error("Debug (Controller): Error deleting photo:", error);
+        res.status(500).json({ error: "Failed to delete photo.", details: error.message });
+    }
+};
+
+// Route to verify photo existence
+const verifyPhoto = async (req, res) => {
+    try {
+        const { photoPath } = req.query;
+        if (!photoPath) {
+            return res.status(400).json({ error: "Photo path is required" });
+        }
+        
+        // Extract filename from path
+        const filename = path.basename(photoPath);
+        const filePath = path.join(UPLOAD_DIR, filename);
+        
+        console.log('Debug (Controller): Verifying photo existence:', { 
+            requestedPath: photoPath,
+            filename: filename,
+            filePath: filePath
+        });
+        
+        // Check if file exists
+        fs.access(filePath, fs.constants.F_OK, (err) => {
+            if (err) {
+                console.log('Debug (Controller): Photo does not exist:', filePath);
+                return res.status(404).json({ 
+                    exists: false, 
+                    message: "Photo does not exist",
+                    requestedPath: photoPath,
+                    resolvedPath: filePath
+                });
+            }
+            
+            console.log('Debug (Controller): Photo exists:', filePath);
+            return res.json({ 
+                exists: true, 
+                message: "Photo exists",
+                url: `/profilePhotos/${filename}`
+            });
+        });
+    } catch (error) {
+        console.error("Debug (Controller): Error verifying photo:", error);
+        res.status(500).json({ error: "Failed to verify photo", details: error.message });
+    }
+};
+
+module.exports = { 
+    uploadPhotos, 
+    getPhotos, 
+    getDefaultPhoto, 
+    deletePhoto,
+    verifyPhoto 
+};

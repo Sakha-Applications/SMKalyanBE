@@ -13,8 +13,15 @@ const savePhotoPath = async (profileId, email, photoPath, filename, isDefault) =
             await connection.execute(updateDefaultQuery, [profileId]);
         }
 
-        const query = "INSERT INTO profile_photos (profile_id, email, photo_path, filename, is_default) VALUES (?, ?, ?, ?, ?)";
-        const values = [profileId, email, photoPath, filename, isDefault];
+        // Construct relative URL path
+        const urlPath = `/profilePhotos/${filename}`;
+
+        const query = `
+            INSERT INTO profile_photos 
+            (profile_id, email, photo_path, filename, url_path, is_default) 
+            VALUES (?, ?, ?, ?, ?, ?)`;
+
+        const values = [profileId, email, photoPath, filename, urlPath, isDefault];
         const [result] = await connection.execute(query, values);
         const insertId = result.insertId;
 
@@ -35,7 +42,10 @@ const savePhotoPath = async (profileId, email, photoPath, filename, isDefault) =
 
 const getPhotosByProfileId = async (profileId) => {
     try {
-        const [rows] = await pool.execute("SELECT photo_path, filename, is_default FROM profile_photos WHERE profile_id = ?", [profileId]);
+        const [rows] = await pool.execute(
+            "SELECT photo_path, filename, url_path, is_default FROM profile_photos WHERE profile_id = ?",
+            [profileId]
+        );
         return rows;
     } catch (error) {
         console.error("Error retrieving photos:", error);
@@ -45,7 +55,10 @@ const getPhotosByProfileId = async (profileId) => {
 
 const getPhotosByEmail = async (email) => {
     try {
-        const [rows] = await pool.execute("SELECT photo_path, filename, is_default FROM profile_photos WHERE email = ?", [email]);
+        const [rows] = await pool.execute(
+            "SELECT photo_path, filename, url_path, is_default FROM profile_photos WHERE email = ?",
+            [email]
+        );
         return rows;
     } catch (error) {
         console.error("Error retrieving photos by email:", error);
@@ -55,7 +68,10 @@ const getPhotosByEmail = async (email) => {
 
 const getDefaultPhoto = async (profileId) => {
     try {
-        const [rows] = await pool.execute("SELECT photo_path, filename FROM profile_photos WHERE profile_id = ? AND is_default = TRUE", [profileId]);
+        const [rows] = await pool.execute(
+            "SELECT photo_path, filename, url_path FROM profile_photos WHERE profile_id = ? AND is_default = TRUE",
+            [profileId]
+        );
         return rows[0]; // Returns the first row, or undefined if no default
     } catch (error) {
         console.error("Error retrieving default photo:", error);
@@ -63,4 +79,9 @@ const getDefaultPhoto = async (profileId) => {
     }
 };
 
-module.exports = { savePhotoPath, getPhotosByProfileId, getPhotosByEmail, getDefaultPhoto };
+module.exports = {
+    savePhotoPath,
+    getPhotosByProfileId,
+    getPhotosByEmail,
+    getDefaultPhoto,
+};
