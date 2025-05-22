@@ -1,5 +1,5 @@
 // controllers/offlinePaymentController.js
-const { insertOfflinePayment, getOfflinePaymentsByProfileId, updatePaymentStatus, recordRenewalPayment } = require('../models/offlinePaymentModel');
+const { insertOfflinePayment, getOfflinePaymentsByProfileId, updatePaymentStatus } = require('../models/offlinePaymentModel');
 
 // Handle submission of offline payment details
 const submitOfflinePayment = async (req, res) => {
@@ -21,7 +21,6 @@ const submitOfflinePayment = async (req, res) => {
         // Get user ID from authentication middleware
         const profile_id = req.body.profile_id || req.user?.id;
         console.log("🔄 profile_id from body:", req.body.profile_id);
-        console.log("🔄 payment_type:", payment_type);
         
         // Validate required fields with updated requirements
         if (!amount || !payment_date || !payment_time || (!phone_number && !email)) {
@@ -30,59 +29,28 @@ const submitOfflinePayment = async (req, res) => {
                 message: 'Missing required payment details. Please provide amount, payment date, time, and either phone or email.' 
             });
         }
-
-        let paymentResult;
         
-        // Check if this is a renewal payment - if so, use special renewal function
-        if (payment_type === 'ProfileRenewal') {
-            console.log("🔄 Processing Profile Renewal payment for profile:", profile_id);
-            
-            paymentResult = await recordRenewalPayment({
-                profile_id,
-                amount,
-                payment_type,
-                payment_mode, 
-                payment_method: payment_method || payment_mode,
-                payment_reference,
-                payment_date,
-                payment_time,
-                phone_number,
-                email,
-                transactionDetails: req.body.transactionDetails
-            }, true); // true indicates to reset contacts
-            
-            // Return success response with additional info about contact reset
-            return res.status(201).json({
-                success: true,
-                message: 'Profile renewal recorded successfully. Your shared contact history has been reset.',
-                paymentId: paymentResult.paymentId,
-                contactsReset: paymentResult.deletedContactRecords,
-                renewalProcessed: true
-            });
-            
-        } else {
-            // Regular payment processing
-            const paymentId = await insertOfflinePayment({
-                profile_id,
-                amount,
-                payment_type,
-                payment_mode,
-                payment_method: payment_method || payment_mode,
-                payment_reference,
-                payment_date,
-                payment_time,
-                phone_number,
-                email,
-                transactionDetails: req.body.transactionDetails
-            });
-            
-            // Return success response for regular payments
-            return res.status(201).json({
-                success: true,
-                message: 'Offline payment record created successfully',
-                paymentId
-            });
-        }
+        // Insert payment record with the updated fields
+        const paymentId = await insertOfflinePayment({
+            profile_id,
+            amount,
+            payment_type,
+            payment_mode, // Keep for backwards compatibility  
+            payment_method: payment_method || payment_mode, // Use payment_method or fallback to payment_mode
+            payment_reference,
+            payment_date,
+            payment_time,
+            phone_number,
+            email,
+            transactionDetails: req.body.transactionDetails // Added transactionDetails to match the table structure
+        });
+        
+        // Return success response with payment ID
+        res.status(201).json({
+            success: true,
+            message: 'Offline payment record created successfully',
+            paymentId
+        });
         
     } catch (error) {
         console.error('❌ Error submitting offline payment:', error);
