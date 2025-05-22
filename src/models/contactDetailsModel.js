@@ -102,7 +102,6 @@ const countUniqueSharedContacts = async (userProfileId) => {
     }
 };
 
-
 const findExistingShare = async (userProfileId, sharedProfileId) => {
     try {
         const query = `
@@ -119,4 +118,29 @@ const findExistingShare = async (userProfileId, sharedProfileId) => {
     }
 };
 
-module.exports = { findContactDetails, recordShare, countUniqueSharedContacts, findExistingShare };
+// New function to reset shared contacts for a profile after renewal
+const resetSharedContactsForProfile = async (profileId) => {
+    try {
+        console.log("🔄 Resetting shared contacts for profile:", profileId);
+        const query = `
+            DELETE FROM contact_details_shared
+            WHERE shared_with_profile_id = ?
+        `;
+        const values = [profileId];
+        const [result] = await pool.execute(query, values);
+        
+        console.log(`✅ Successfully deleted ${result.affectedRows} shared contact records for profile ${profileId}`);
+        return result.affectedRows;
+    } catch (error) {
+        console.error("❌ Error resetting shared contacts for profile:", error);
+        throw error;
+    }
+};
+
+module.exports = { 
+    findContactDetails, 
+    recordShare, 
+    countUniqueSharedContacts, 
+    findExistingShare,
+    resetSharedContactsForProfile
+};
