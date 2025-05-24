@@ -29,7 +29,7 @@ const addProfile = async (req, res) => {
             if (userLoginData && calculatedProfileId) {
                 try {
                     console.log("➡️ Attempting to create user login with profileId:", calculatedProfileId, "user_id:", userLoginData.user_id);
-                    const userLoginResponse = await axios.post(`${config.apiUrl}/userlogin`, {
+                    const userLoginResponse = await axios.post(`https://sakhasvc-agfcdyb7bjarbtdw.centralus-01.azurewebsites.net/api/userlogin`, {
                         profileId: calculatedProfileId, // Use the generated VARCHAR profileId
                         user_id: userLoginData.user_id,
                         password: userLoginData.password
