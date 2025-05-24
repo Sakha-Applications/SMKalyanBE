@@ -29,7 +29,6 @@ const designationRoutes = require("./routes/designationRoutes");
 
 const educationRoutes = require('./routes/educationRoutes'); // Adjust the path if needed
 
-const preferredProfileRoutes = require('./routes/preferredProfileRoutes');
 
 const guruMathaRoutes = require("./routes/guruMathaRoutes");
 // const paymentRoutes = require('./routes/paymentRoutes'); // Import payment routes
@@ -77,9 +76,6 @@ app.use("/api", offlinePaymentRoutes);
 
 // Add this with your other route usages
 app.use("/api", designationRoutes);
-
-// Add this line with your other route declarations
-app.use('/api/preferred-profiles', preferredProfileRoutes);
 
 app.use('/api', educationRoutes);
 
