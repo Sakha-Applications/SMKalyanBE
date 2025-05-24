@@ -29,7 +29,7 @@ const designationRoutes = require("./routes/designationRoutes");
 
 const educationRoutes = require('./routes/educationRoutes'); // Adjust the path if needed
 
-const preferredProfileRoutes = require('./routes/preferredProfileRoutes');
+//const preferredProfileRoutes = require('./routes/preferredProfileRoutes');
 const guruMathaRoutes = require("./routes/guruMathaRoutes");
 // const paymentRoutes = require('./routes/paymentRoutes'); // Import payment routes
 require("dotenv").config();
@@ -79,7 +79,7 @@ app.use("/api", designationRoutes);
 
 app.use('/api', educationRoutes);
 
-app.use('/api', preferredProfileRoutes);
+//app.use('/api', preferredProfileRoutes);
 
 console.log('Contact Details routes mounted under /api'); // Add this log
 
