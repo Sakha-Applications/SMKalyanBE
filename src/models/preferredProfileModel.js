@@ -1,4 +1,4 @@
-const db = require('../config/database'); // Adjust path to your database config
+const db = require('../config/db'); // Adjust path to your database config
 
 class PreferredProfileModel {
   
