@@ -258,63 +258,6 @@ class PreferredProfileController {
   }
 
   /**
-   * NEW: Get preferred profiles for frontend display (Home/Dashboard)
-   * GET /api/preferred-profiles/display
-   */
-  static async getPreferredProfilesForDisplay(req, res) {
-    try {
-      const limit = parseInt(req.query.limit) || 10;
-      const format = req.query.format || 'ticker'; // 'ticker' or 'cards'
-
-      if (limit > 50) {
-        return res.status(400).json({
-          success: false,
-          message: 'Display limit cannot exceed 50'
-        });
-      }
-
-      let profiles;
-      
-      if (format === 'ticker') {
-        // For ticker: simplified data with transaction_details
-        profiles = await PreferredProfileModel.getPreferredProfilesForDisplay(limit, 'ticker');
-      } else if (format === 'cards') {
-        // For cards: more detailed data
-        profiles = await PreferredProfileModel.getPreferredProfilesForDisplay(limit, 'cards');
-      } else {
-        return res.status(400).json({
-          success: false,
-          message: 'Invalid format. Use "ticker" or "cards"'
-        });
-      }
-
-      // Add cache headers for performance
-      res.set({
-        'Cache-Control': 'public, max-age=300', // 5 minutes cache
-        'ETag': `"${Date.now()}"` // Simple ETag
-      });
-
-      res.status(200).json({
-        success: true,
-        data: profiles,
-        meta: {
-          format,
-          count: profiles.length,
-          refreshInterval: 300000 // 5 minutes in milliseconds
-        }
-      });
-
-    } catch (error) {
-      console.error('[PreferredProfileController] Error fetching preferred profiles for display:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Internal server error while fetching display profiles',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
-      });
-    }
-  }
-
-  /**
    * Check if a profile is currently preferred
    * GET /api/preferred-profiles/check/:profileId
    */
