@@ -48,6 +48,16 @@ router.get('/ticker', PreferredProfileController.getPreferredProfilesForTicker);
 router.get('/stats', requireAuth, PreferredProfileController.getPreferredProfilesStats);
 
 /**
+ * @route   GET /api/preferred-profiles/display
+ * @desc    Get preferred profiles for frontend display (Home/Dashboard)
+ * @access  Public
+ * @query   limit - Number of records (default: 10, max: 50)
+ * @query   format - Format type ('ticker' or 'cards')
+ */
+router.get('/display', PreferredProfileController.getPreferredProfilesForDisplay);
+
+
+/**
  * @route   GET /api/preferred-profiles/check/:profileId
  * @desc    Check if a profile is currently preferred
  * @access  Public

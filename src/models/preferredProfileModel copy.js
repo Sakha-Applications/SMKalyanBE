@@ -138,7 +138,7 @@ class PreferredProfileModel {
         WHERE status = 'active' 
           AND preferred_flag = 1 
           AND validity_date >= CURDATE()
-        ORDER BY updated_at DESC
+        ORDER BY created_at DESC
         LIMIT ? OFFSET ?
       `;
 
@@ -291,120 +291,6 @@ class PreferredProfileModel {
     } catch (error) {
       console.error('[PreferredProfileModel] Error fetching preferred profiles for ticker:', error);
       throw error;
-    }
-  }
-
-  /**
-   * NEW: Get preferred profiles for frontend display (Home/Dashboard)
-   * @param {number} limit - Number of profiles to fetch
-   * @param {string} format - Format type ('ticker' or 'cards')
-   * @returns {Promise<Array>} Array of preferred profiles for display
-   */
-  static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
-    try {
-      let query;
-      
-      if (format === 'ticker') {
-        // For ticker: focus on transaction details and member names
-        query = `
-          SELECT 
-            profile_id, 
-            member_name,
-            transaction_details,
-            DATEDIFF(validity_date, CURDATE()) as days_remaining,
-            updated_at
-          FROM preferred_profiles 
-          WHERE status = 'active' 
-            AND preferred_flag = 1 
-            AND validity_date >= CURDATE()
-            AND transaction_details IS NOT NULL
-            AND transaction_details != ''
-          ORDER BY updated_at DESC
-          LIMIT ?
-        `;
-      } else {
-        // For cards: more comprehensive data
-        query = `
-          SELECT 
-            id,
-            profile_id, 
-            member_name,
-            transaction_details,
-            payment_amount,
-            validity_date,
-            DATEDIFF(validity_date, CURDATE()) as days_remaining,
-            updated_at,
-            created_at
-          FROM preferred_profiles 
-          WHERE status = 'active' 
-            AND preferred_flag = 1 
-            AND validity_date >= CURDATE()
-          ORDER BY updated_at DESC
-          LIMIT ?
-        `;
-      }
-
-      const [rows] = await db.execute(query, [limit]);
-      
-      // Process the data for frontend consumption
-      return rows.map(row => ({
-        ...row,
-        // Truncate transaction_details for display
-        display_summary: row.transaction_details ? 
-          (row.transaction_details.length > 100 ? 
-            row.transaction_details.substring(0, 97) + '...' : 
-            row.transaction_details) : 
-          `${row.member_name} is a preferred member`,
-        // Add display-friendly dates
-        display_date: row.updated_at ? 
-          new Date(row.updated_at).toLocaleDateString() : null,
-        // Add status indicators
-        urgency: row.days_remaining <= 7 ? 'urgent' : 
-                 row.days_remaining <= 30 ? 'moderate' : 'normal'
-      }));
-      
-    } catch (error) {
-      console.error('[PreferredProfileModel] Error fetching preferred profiles for display:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * NEW: Get cached preferred profiles for display (with simple in-memory caching)
-   * @param {number} limit - Number of profiles to fetch
-   * @param {string} format - Format type ('ticker' or 'cards')
-   * @returns {Promise<Array>} Array of preferred profiles for display
-   */
-  static async getCachedPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
-    try {
-      // Simple cache implementation - in production, use Redis or similar
-      const cacheKey = `preferred_profiles_${format}_${limit}`;
-      const cacheTimeout = 5 * 60 * 1000; // 5 minutes
-      
-      // Check if we have a cache (this would be stored in Redis in production)
-      if (this._cache && this._cache[cacheKey] && 
-          (Date.now() - this._cache[cacheKey].timestamp) < cacheTimeout) {
-        console.log(`[PreferredProfileModel] Returning cached data for ${cacheKey}`);
-        return this._cache[cacheKey].data;
-      }
-
-      // Fetch fresh data
-      const data = await this.getPreferredProfilesForDisplay(limit, format);
-      
-      // Store in cache
-      if (!this._cache) this._cache = {};
-      this._cache[cacheKey] = {
-        data,
-        timestamp: Date.now()
-      };
-
-      console.log(`[PreferredProfileModel] Cached fresh data for ${cacheKey}`);
-      return data;
-      
-    } catch (error) {
-      console.error('[PreferredProfileModel] Error in cached preferred profiles:', error);
-      // Fallback to non-cached version
-      return this.getPreferredProfilesForDisplay(limit, format);
     }
   }
 }
