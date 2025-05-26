@@ -283,7 +283,7 @@ class PreferredProfileModel {
           AND preferred_flag = 1 
           AND validity_date >= CURDATE()
         ORDER BY RAND()
-        LIMIT ?
+        LIMIT 10
       `;
 
       const [rows] = await db.execute(query, [limit]);
@@ -321,7 +321,7 @@ class PreferredProfileModel {
             AND transaction_details IS NOT NULL
             AND transaction_details != ''
           ORDER BY updated_at DESC
-          LIMIT ?
+          LIMIT 10
         `;
       } else {
         // For cards: more comprehensive data
@@ -341,14 +341,14 @@ class PreferredProfileModel {
             AND preferred_flag = 1 
             AND validity_date >= CURDATE()
           ORDER BY updated_at DESC
-          LIMIT ?
+          LIMIT 10
         `;
       }
 
       console.log(`[PreferredProfileModel] Fetched preferred profiles with limit = ${limit} and format = ${format}`);
       console.log('[PreferredProfileModel] Executing SQL query:\n', query);
       
-      const [rows] = await db.execute(query, [limit]);
+      const [rows] = await db.execute(query);
       
       // Process the data for frontend consumption
       return rows.map(row => ({
