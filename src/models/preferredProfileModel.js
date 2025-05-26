@@ -302,6 +302,10 @@ class PreferredProfileModel {
    */
   static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
     try {
+      limit = parseInt(limit, 10);
+    if (isNaN(limit) || limit <= 0) {
+      limit = 10;
+    }
       let query;
       
       if (format === 'ticker') {
