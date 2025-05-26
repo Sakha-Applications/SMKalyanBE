@@ -302,10 +302,7 @@ class PreferredProfileModel {
    */
   static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
     try {
-      limit = parseInt(limit, 10);
-    if (isNaN(limit) || limit <= 0) {
-      limit = 10;
-    }
+      
       let query;
       
       if (format === 'ticker') {
@@ -348,6 +345,9 @@ class PreferredProfileModel {
         `;
       }
 
+      console.log(`[PreferredProfileModel] Fetched preferred profiles with limit = ${limit} and format = ${format}`);
+      console.log('[PreferredProfileModel] Executing SQL query:\n', query);
+      
       const [rows] = await db.execute(query, [limit]);
       
       // Process the data for frontend consumption
