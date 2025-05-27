@@ -1,7 +1,7 @@
 const db = require('../config/db'); // Adjust path to your database config
 
 class PreferredProfileModel {
-  
+
   /**
    * Create a new preferred profile record
    * @param {Object} profileData - Preferred profile data
@@ -48,12 +48,12 @@ class PreferredProfileModel {
       ];
 
       const [result] = await db.execute(query, values);
-      
+
       // Fetch and return the created record
       const createdRecord = await this.getPreferredProfileById(result.insertId);
-      
+
       console.log(`[PreferredProfileModel] Created preferred profile for ${profile_id}, valid until ${validity_date}`);
-      
+
       return createdRecord;
     } catch (error) {
       console.error('[PreferredProfileModel] Error creating preferred profile:', error);
@@ -69,17 +69,17 @@ class PreferredProfileModel {
   static async getPreferredProfileById(id) {
     try {
       const query = `
-        SELECT 
+        SELECT
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date, transaction_details, preferred_flag, status,
           created_at, updated_at,
           DATEDIFF(validity_date, CURDATE()) as days_remaining,
-          CASE 
+          CASE
             WHEN validity_date >= CURDATE() THEN 'valid'
             ELSE 'expired'
           END as validity_status
-        FROM preferred_profiles 
+        FROM preferred_profiles
         WHERE id = ?
       `;
 
@@ -99,13 +99,13 @@ class PreferredProfileModel {
   static async getActivePreferredProfile(profileId) {
     try {
       const query = `
-        SELECT 
+        SELECT
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date, transaction_details, preferred_flag, status,
           created_at, updated_at,
           DATEDIFF(validity_date, CURDATE()) as days_remaining
-        FROM preferred_profiles 
+        FROM preferred_profiles
         WHERE profile_id = ? AND status = 'active' AND validity_date >= CURDATE()
         ORDER BY created_at DESC
         LIMIT 1
@@ -127,22 +127,29 @@ class PreferredProfileModel {
    */
   static async getActivePreferredProfiles(limit = 20, offset = 0) {
     try {
+      // Ensure limit and offset are integers
+      const parsedLimit = parseInt(limit, 10);
+      const parsedOffset = parseInt(offset, 10);
+
       const query = `
-        SELECT 
+        SELECT
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date, transaction_details, preferred_flag, status,
           created_at, updated_at,
           DATEDIFF(validity_date, CURDATE()) as days_remaining
-        FROM preferred_profiles 
-        WHERE status = 'active' 
-          AND preferred_flag = 1 
+        FROM preferred_profiles
+        WHERE status = 'active'
+          AND preferred_flag = 1
           AND validity_date >= CURDATE()
         ORDER BY updated_at DESC
         LIMIT ? OFFSET ?
       `;
 
-      const [rows] = await db.execute(query, [limit, offset]);
+      console.log('[PreferredProfileModel] Executing getActivePreferredProfiles query:', query);
+      console.log('[PreferredProfileModel] Parameters:', [parsedLimit, parsedOffset]);
+
+      const [rows] = await db.execute(query, [parsedLimit, parsedOffset]);
       return rows;
     } catch (error) {
       console.error('[PreferredProfileModel] Error fetching active preferred profiles:', error);
@@ -158,17 +165,17 @@ class PreferredProfileModel {
   static async getPreferredProfilesByEmail(email) {
     try {
       const query = `
-        SELECT 
+        SELECT
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date, transaction_details, preferred_flag, status,
           created_at, updated_at,
           DATEDIFF(validity_date, CURDATE()) as days_remaining,
-          CASE 
+          CASE
             WHEN validity_date >= CURDATE() THEN 'valid'
             ELSE 'expired'
           END as validity_status
-        FROM preferred_profiles 
+        FROM preferred_profiles
         WHERE email = ?
         ORDER BY created_at DESC
       `;
@@ -188,15 +195,15 @@ class PreferredProfileModel {
   static async updateExpiredProfiles() {
     try {
       const query = `
-        UPDATE preferred_profiles 
-        SET status = 'expired', updated_at = CURRENT_TIMESTAMP 
+        UPDATE preferred_profiles
+        SET status = 'expired', updated_at = CURRENT_TIMESTAMP
         WHERE status = 'active' AND validity_date < CURDATE()
       `;
 
       const [result] = await db.execute(query);
-      
+
       console.log(`[PreferredProfileModel] Updated ${result.affectedRows} expired preferred profiles`);
-      
+
       return result.affectedRows;
     } catch (error) {
       console.error('[PreferredProfileModel] Error updating expired profiles:', error);
@@ -212,15 +219,15 @@ class PreferredProfileModel {
   static async cancelPreferredProfile(profileId) {
     try {
       const query = `
-        UPDATE preferred_profiles 
-        SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP 
+        UPDATE preferred_profiles
+        SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
         WHERE profile_id = ? AND status = 'active'
       `;
 
       const [result] = await db.execute(query, [profileId]);
-      
+
       console.log(`[PreferredProfileModel] Cancelled preferred profile for ${profileId}`);
-      
+
       return result.affectedRows > 0;
     } catch (error) {
       console.error('[PreferredProfileModel] Error cancelling preferred profile:', error);
@@ -235,7 +242,7 @@ class PreferredProfileModel {
   static async getPreferredProfilesStats() {
     try {
       const query = `
-        SELECT 
+        SELECT
           COUNT(*) as total_records,
           COUNT(CASE WHEN status = 'active' AND validity_date >= CURDATE() THEN 1 END) as active_count,
           COUNT(CASE WHEN status = 'expired' THEN 1 END) as expired_count,
@@ -274,19 +281,25 @@ class PreferredProfileModel {
    */
   static async getPreferredProfilesForTicker(limit = 10) {
     try {
+      // The 'limit' parameter is no longer used in the SQL query as per user's request.
+      // It's kept in the function signature for compatibility if needed elsewhere.
+      const parsedLimit = parseInt(limit, 10); // Still parse for logging/potential future use
+
       const query = `
-        SELECT 
+        SELECT
           profile_id, member_name, validity_date,
           DATEDIFF(validity_date, CURDATE()) as days_remaining
-        FROM preferred_profiles 
-        WHERE status = 'active' 
-          AND preferred_flag = 1 
+        FROM preferred_profiles
+        WHERE status = 'active'
+          AND preferred_flag = 1
           AND validity_date >= CURDATE()
         ORDER BY RAND()
-        LIMIT 10
       `;
 
-      const [rows] = await db.execute(query, [limit]);
+      console.log('[PreferredProfileModel] Executing getPreferredProfilesForTicker query (no LIMIT):', query);
+      console.log('[PreferredProfileModel] Parameters (none passed to DB): []');
+
+      const [rows] = await db.execute(query); // No limit parameter passed
       return rows;
     } catch (error) {
       console.error('[PreferredProfileModel] Error fetching preferred profiles for ticker:', error);
@@ -294,84 +307,113 @@ class PreferredProfileModel {
     }
   }
 
-  /**
-   * NEW: Get preferred profiles for frontend display (Home/Dashboard)
-   * @param {number} limit - Number of profiles to fetch
-   * @param {string} format - Format type ('ticker' or 'cards')
-   * @returns {Promise<Array>} Array of preferred profiles for display
-   */
-  static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
-    try {
-      
-      let query;
-      
-      if (format === 'ticker') {
-        // For ticker: focus on transaction details and member names
-        query = `
-          SELECT 
-            profile_id, 
-            member_name,
-            transaction_details,
-            DATEDIFF(validity_date, CURDATE()) as days_remaining,
-            updated_at
-          FROM preferred_profiles 
-          WHERE status = 'active' 
-            AND preferred_flag = 1 
-            AND validity_date >= CURDATE()
-            AND transaction_details IS NOT NULL
-            AND transaction_details != ''
-          ORDER BY updated_at DESC
-          LIMIT 10
-        `;
-      } else {
-        // For cards: more comprehensive data
-        query = `
-          SELECT 
-            id,
-            profile_id, 
-            member_name,
-            transaction_details,
-            payment_amount,
-            validity_date,
-            DATEDIFF(validity_date, CURDATE()) as days_remaining,
-            updated_at,
-            created_at
-          FROM preferred_profiles 
-          WHERE status = 'active' 
-            AND preferred_flag = 1 
-            AND validity_date >= CURDATE()
-          ORDER BY updated_at DESC
-          LIMIT 10
-        `;
-      }
+/**
+ * Get preferred profiles for frontend display (Home/Dashboard) with full profile details
+ * @param {number} limit - Number of profiles to fetch (no longer used in query)
+ * @param {string} format - Format type ('ticker' or 'cards')
+ * @returns {Promise<Array>} Array of preferred profiles for display
+ */
+static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
+  try {
+    let query;
+    // The 'limit' parameter is no longer used in the SQL query as per user's request.
+    // It's kept in the function signature for compatibility if needed elsewhere.
+    const parsedLimit = parseInt(limit, 10); // Still parse for logging/potential future use
 
-      console.log(`[PreferredProfileModel] Fetched preferred profiles with limit = ${limit} and format = ${format}`);
-      console.log('[PreferredProfileModel] Executing SQL query:\n', query);
-      
-      const [rows] = await db.execute(query);
-      
-      // Process the data for frontend consumption
-      return rows.map(row => ({
-        ...row,
-        // Truncate transaction_details for display
-        display_summary: row.transaction_details ? 
-          (row.transaction_details.length > 100 ? 
-            row.transaction_details.substring(0, 97) + '...' : 
-            row.transaction_details) : 
-          `${row.member_name} is a preferred member`,
-        // Add display-friendly dates
-        display_date: row.updated_at ? 
-          new Date(row.updated_at).toLocaleDateString() : null,
-        // Add status indicators
-        urgency: row.days_remaining <= 7 ? 'urgent' : 
-                 row.days_remaining <= 30 ? 'moderate' : 'normal'
-      }));
-      
-    } catch (error) {
-      console.error('[PreferredProfileModel] Error fetching preferred profiles for display:', error);
-      throw error;
+    console.log('[PreferredProfileModel] getPreferredProfilesForDisplay - Received Limit (not used in query):', limit, 'Parsed Limit:', parsedLimit, 'Type:', typeof parsedLimit);
+
+    if (format === 'ticker') {
+      query = `
+        SELECT
+          pp.profile_id,
+          pp.member_name,
+          pp.transaction_details,
+          DATEDIFF(pp.validity_date, CURDATE()) as days_remaining,
+          pp.updated_at
+        FROM preferred_profiles pp
+        WHERE pp.status = 'active'
+          AND pp.preferred_flag = 1
+          AND pp.validity_date >= CURDATE()
+        ORDER BY pp.updated_at DESC
+      `;
+    } else {
+      // FIXED: Enhanced query with proper field mappings and null handling
+      query = `
+        SELECT
+          pp.id,
+          pp.profile_id,
+          pp.member_name,
+          pp.transaction_details,
+          pp.payment_amount,
+          pp.validity_date,
+          DATEDIFF(pp.validity_date, CURDATE()) as days_remaining,
+          pp.updated_at,
+          pp.created_at,
+
+          -- Fields from the profile table with proper null handling
+          COALESCE(p.name, pp.member_name, 'N/A') as name,
+          COALESCE(p.current_age, 0) as current_age,
+          COALESCE(p.gotra, 'Not specified') as gotra,
+          COALESCE(p.rashi, 'Not specified') as rashi,
+          COALESCE(p.nakshatra, 'Not specified') as nakshatra,
+          COALESCE(p.profession, p.designation, 'Not specified') as profession,
+          COALESCE(p.current_location, p.current_location, 'Not specified') as city,
+          COALESCE(p.working_status, 'Not specified') as working_status,
+          COALESCE(p.education, 'Not specified') as education,
+          COALESCE(p.designation, 'Not specified') as designation,
+          COALESCE(p.married_status, 'Not specified') as married_status,
+
+          -- Additional fields that might be useful
+          COALESCE(p.height, 'Not specified') as height,
+          COALESCE(p.mother_tongue, 'Not specified') as mother_tongue
+
+        FROM preferred_profiles pp
+        LEFT JOIN profile p ON pp.profile_id = p.profile_id
+        WHERE pp.status = 'active'
+          AND pp.preferred_flag = 1
+          AND pp.validity_date >= CURDATE()
+        ORDER BY pp.updated_at DESC
+      `;
     }
+
+    console.log('[PreferredProfileModel] Executing getPreferredProfilesForDisplay query (no LIMIT):', query);
+    console.log('[PreferredProfileModel] Parameters (none passed to DB): []');
+
+    const [rows] = await db.execute(query); // No limit parameter passed
+
+    return rows.map(row => ({
+      ...row,
+      // Ensure display_summary is always available
+      display_summary: row.transaction_details && row.transaction_details.trim()
+        ? (row.transaction_details.length > 100
+          ? row.transaction_details.substring(0, 97) + '...'
+          : row.transaction_details)
+        : `${row.name || row.member_name || 'Profile'} is a preferred member looking for a life partner.`,
+
+      // Ensure proper date formatting
+      display_date: row.updated_at ? new Date(row.updated_at).toLocaleDateString() : null,
+
+      // Add urgency indicator
+      urgency: row.days_remaining <= 7 ? 'urgent' : row.days_remaining <= 30 ? 'moderate' : 'normal',
+
+      // Ensure age is a number
+      current_age: parseInt(row.current_age) || 0,
+
+      // Clean up any null values that might cause frontend issues
+      profile_id: row.profile_id || 'N/A',
+      member_name: row.member_name || row.name || 'N/A',
+      name: row.name || row.member_name || 'N/A',
+      city: row.city || 'Not specified',
+      profession: row.profession || 'Not specified',
+      gotra: row.gotra || 'Not specified',
+      rashi: row.rashi || 'Not specified',
+      nakshatra: row.nakshatra || 'Not specified'
+    }));
+  } catch (error) {
+    console.error('[PreferredProfileModel] Error fetching preferred profiles for display:', error);
+    throw error;
   }
+}
 
   /**
    * NEW: Get cached preferred profiles for display (with simple in-memory caching)
@@ -382,19 +424,22 @@ class PreferredProfileModel {
   static async getCachedPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
     try {
       // Simple cache implementation - in production, use Redis or similar
+      // The 'limit' parameter is still used for cache key differentiation,
+      // even though the underlying SQL query no longer uses it.
       const cacheKey = `preferred_profiles_${format}_${limit}`;
       const cacheTimeout = 5 * 60 * 1000; // 5 minutes
-      
+
       // Check if we have a cache (this would be stored in Redis in production)
-      if (this._cache && this._cache[cacheKey] && 
+      if (this._cache && this._cache[cacheKey] &&
           (Date.now() - this._cache[cacheKey].timestamp) < cacheTimeout) {
         console.log(`[PreferredProfileModel] Returning cached data for ${cacheKey}`);
         return this._cache[cacheKey].data;
       }
 
-      // Fetch fresh data
-      const data = await this.getPreferredProfilesForDisplay(limit, format);
-      
+      // Fetch fresh data. The parsed limit is passed to getPreferredProfilesForDisplay,
+      // but it will be ignored in the SQL query itself.
+      const data = await this.getPreferredProfilesForDisplay(parseInt(limit, 10), format);
+
       // Store in cache
       if (!this._cache) this._cache = {};
       this._cache[cacheKey] = {
@@ -404,11 +449,11 @@ class PreferredProfileModel {
 
       console.log(`[PreferredProfileModel] Cached fresh data for ${cacheKey}`);
       return data;
-      
+
     } catch (error) {
       console.error('[PreferredProfileModel] Error in cached preferred profiles:', error);
-      // Fallback to non-cached version
-      return this.getPreferredProfilesForDisplay(limit, format);
+      // Fallback to non-cached version, ensuring limit is an integer
+      return this.getPreferredProfilesForDisplay(parseInt(limit, 10), format);
     }
   }
 }
