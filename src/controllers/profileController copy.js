@@ -17,7 +17,6 @@ const addProfile = async (req, res) => {
 
     try {
         // 1. Insert the profile data
-        console.log("📥 Inserting profile data...");
         const profileResult = await createProfile(profileData);
         console.log("✅ Profile creation result:", profileResult);
 
@@ -76,15 +75,9 @@ const addProfile = async (req, res) => {
                         html: emailHtmlContent
                     };
 
-                    console.log("📧 Calling sendEmailReport with options:", {
-                        from: mailOptions.from,
-                        to: mailOptions.to,
-                        subject: mailOptions.subject
-                    });
-
                     try {
                         const emailResult = await sendEmailReport(mailOptions);
-                        console.log('📨 Email sent result:', emailResult);
+                        console.log('📧 Email sent successfully:', emailResult);
                         return res.status(201).json({
                             message: "Profile and user login created successfully, confirmation email sent",
                             profileId: calculatedProfileId,
@@ -137,9 +130,7 @@ const addProfile = async (req, res) => {
 // Fetch all profiles (using the imported fetchAllProfiles)
 const getAllProfiles = async (req, res) => {
     try {
-        console.log("📥 Fetching all profiles...");
         const profiles = await fetchAllProfiles();
-        console.log("✅ Profiles fetched:", Array.isArray(profiles[0]) ? profiles[0].length : 0);
         res.status(200).json(profiles[0]); // Assuming fetchAllProfiles returns an array with one element being the rows
     } catch (error) {
         console.error("❌ Error fetching all profiles:", error);
