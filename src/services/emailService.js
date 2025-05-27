@@ -1,6 +1,11 @@
 // src/services/emailService.js
 const nodemailer = require('nodemailer');
-console.log("✅ emailService.js loaded (DEBUG MODE)");
+console.log("✅ emailService.js loaded (HARD-CODED MODE)");
+
+// ❗️Hardcoded credentials (for testing only — DO NOT use in production)
+const EMAIL_USER = "smkalyanasakha@gmail.com";               // Replace with your actual Gmail address
+const EMAIL_PASSWORD = "ksvi cuyy szef fbgi";     
+const EMAIL_FROM="SM Kalyana Sakha";       // Replace with your Gmail App Password
 
 // Log environment variable status (DO NOT log actual values in production)
 console.log("📦 EMAIL_USER:", process.env.EMAIL_USER ? "✅ Set" : "❌ Missing");
