@@ -20,7 +20,7 @@ const createProfile = async (formData) => {
     reference2Phone,
     howDidYouKnow,
     workingStatus, education, profession, designation,
-    currentCompany, profileCategory, profileCategoryneed, annualIncome,
+    currentCompany, profileCategory, profileCategoryNeed, annualIncome,
     shareDetailsOnPlatform
   } = formData;
 
@@ -44,7 +44,7 @@ const createProfile = async (formData) => {
     reference2Phone,
     howDidYouKnow,
     workingStatus, education, profession, designation,
-    currentCompany, profileCategory, profileCategoryneed, annualIncome,
+    currentCompany, profileCategory, profileCategoryNeed, annualIncome,
     shareDetailsOnPlatform
   ]);
 
@@ -95,7 +95,7 @@ const createProfile = async (formData) => {
     reference2Phone,
     howDidYouKnow,
     workingStatus, education, profession, designation,
-    currentCompany, profileCategory, profileCategoryneed, annualIncome,
+    currentCompany, profileCategory, profileCategoryNeed, annualIncome,
     shareDetailsOnPlatform
   ]; // This array contains 46 elements.
 

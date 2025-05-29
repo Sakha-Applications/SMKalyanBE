@@ -48,17 +48,19 @@ const UserLogin = {
 
     // ADD THIS CREATE FUNCTION:
     create: async (userData) => {
-        try {
-            const { profileId, user_id, password } = userData;
-            const sql = "INSERT INTO userlogin (profile_id, user_id, password) VALUES (?, ?, ?)";
-            const [result] = await pool.execute(sql, [profileId, user_id, password]);
-            return { user_id, insertId: result.insertId };
-        } catch (error) {
-            console.error("❌ Error creating user login in model:", error);
-            throw error;
-        }
-    },
-
+    try {
+        const { profileId, user_id, password, role, is_active, notes } = userData;
+        const sql = `
+            INSERT INTO userlogin (profile_id, user_id, password, role, is_active, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `;
+        const [result] = await pool.execute(sql, [profileId, user_id, password, role, is_active, notes]);
+        return { user_id, insertId: result.insertId };
+    } catch (error) {
+        console.error("❌ Error creating user login in model:", error);
+        throw error;
+    }
+},
     // ... other functions
 };
 

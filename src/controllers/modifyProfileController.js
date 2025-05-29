@@ -1,10 +1,9 @@
 // backend/controllers/modifyProfileController.js
-const UserLogin = require('../models/userLoginModel');          // Adjust path if needed
-const modifyProfileModel = require('../models/modifyProfileModel'); // Consistent import name
+const UserLogin = require('../models/userLoginModel');
+const modifyProfileModel = require('../models/modifyProfileModel');
 
-// This is the modified function for updating profiles with field name mapping
 const updateOwnProfile = async (req, res) => {
-    const userEmail = req.user.userId; // Get user ID (email) from the authenticated request
+    const userEmail = req.user.userId;
     let profileData = req.body;
 
     console.log('🟢 Updating profile for user:', userEmail);
@@ -20,9 +19,9 @@ const updateOwnProfile = async (req, res) => {
         }
     });
 
-    // Map camelCase field names from frontend to snake_case for database
+    // UPDATED: Complete field mappings from frontend camelCase to database snake_case
     const fieldMappings = {
-        // Map frontend to backend field names
+        // Basic mappings
         fatherName: 'father_name',
         motherName: 'mother_name',
         fatherProfession: 'father_profession',
@@ -31,31 +30,47 @@ const updateOwnProfile = async (req, res) => {
         timeOfBirth: 'time_of_birth',
         charanaPada: 'charana_pada',
         subCaste: 'sub_caste',
-        // Fix missing field mappings
         alternatePhone: 'alternate_phone',
         communicationAddress: 'communication_address',
         residenceAddress: 'residence_address',
-        // Add additional field mappings that were missing
         annualIncome: 'annual_income',
         currentCompany: 'current_company',
         currentAge: 'current_age',
-        profileId: 'profile_id',
         workingStatus: 'working_status',
+        
+        // MISSING MAPPINGS - These were causing the population issues:
+        profileCreatedFor: 'profile_created_for',
+        profileFor: 'profile_for',
+        motherTongue: 'mother_tongue',
+        nativePlace: 'native_place',
+        currentLocation: 'current_location',
+        profileStatus: 'profile_status',
+        marriedStatus: 'married_status',
+        placeOfBirth: 'place_of_birth',
+        aboutBrideGroom: 'about_bride_groom',
+        reference1Name: 'reference1_name',
+        reference1Phone: 'reference1_phone',
+        reference2Name: 'reference2_name',
+        reference2Phone: 'reference2_phone',
+        howDidYouKnow: 'how_did_you_know',
+        profileCategory: 'profile_category',
+        profileCategoryNeed: 'profile_category_need',
+        shareDetailsOnPlatform: 'share_details_on_platform',
+        
+        // Height fields (if you're using separate feet/inches)
         heightFeet: 'height_feet',
         heightInches: 'height_inches'
     };
 
-    // Create a new object with properly mapped field names
+    // Create mapped profile data
     const mappedProfileData = {};
     
-    // Copy all existing fields
     Object.keys(profileData).forEach(key => {
-        // If there's a mapping for this field, use the mapped name
         if (fieldMappings[key]) {
             mappedProfileData[fieldMappings[key]] = profileData[key];
             console.log(`🟢 Mapping field: ${key} -> ${fieldMappings[key]} with value:`, profileData[key]);
         } else {
-            // Otherwise keep the original field name
+            // Keep original field name for fields that don't need mapping
             mappedProfileData[key] = profileData[key];
         }
     });
@@ -63,44 +78,6 @@ const updateOwnProfile = async (req, res) => {
     console.log('🟢 Processed profile data:', JSON.stringify(mappedProfileData, null, 2));
 
     try {
-        // 1. Find the user by email to get the associated profile ID
-        const user = await UserLogin.findByUserId(userEmail);
-        if (!user) {
-            console.log('❌ User not found for email:', userEmail);
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        const profileId = user.profile_id; // Use the correct field name
-        if (!profileId) {
-            console.log('❌ Profile ID not found for user:', userEmail);
-            return res.status(400).json({ error: 'Profile ID not found for this user.' });
-        }
-
-        console.log('🟢 Found profile ID for user:', profileId);
-
-        // 2. Update the profile data in the database
-        const result = await modifyProfileModel.updateProfile(profileId, mappedProfileData); // Use mapped data
-        console.log('🟢 Update result:', result);
-
-        if (result && result.affectedRows > 0) {
-            res.status(200).json({ message: 'Profile updated successfully', profileId });
-        } else {
-            res.status(400).json({ error: 'Failed to update profile. Profile may not exist, or no changes were made.' });
-        }
-    } catch (error) {
-        console.error('❌ Error updating profile:', error);
-        res.status(500).json({ error: 'Internal server error', details: error.message });
-    }
-};
-
-// This is the function for getting profile data - with field name mapping for frontend
-const getOwnProfile = async (req, res) => {
-    const userEmail = req.user.userId; // Get user ID (email) from the authenticated request
-
-    console.log('🟢 Fetching profile for user:', userEmail);
-
-    try {
-        // 1. Find the user by email to get the associated profile ID
         const user = await UserLogin.findByUserId(userEmail);
         if (!user) {
             console.log('❌ User not found for email:', userEmail);
@@ -115,19 +92,48 @@ const getOwnProfile = async (req, res) => {
 
         console.log('🟢 Found profile ID for user:', profileId);
 
-        // 2. Get the profile data from the database
-        const profile = await modifyProfileModel.getProfileById(profileId); // Consistent module name
+        const result = await modifyProfileModel.updateProfile(profileId, mappedProfileData);
+        console.log('🟢 Update result:', result);
 
+        if (result && result.affectedRows > 0) {
+            res.status(200).json({ message: 'Profile updated successfully', profileId });
+        } else {
+            res.status(400).json({ error: 'Failed to update profile. Profile may not exist, or no changes were made.' });
+        }
+    } catch (error) {
+        console.error('❌ Error updating profile:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+};
+
+const getOwnProfile = async (req, res) => {
+    const userEmail = req.user.userId;
+    console.log('🟢 Fetching profile for user:', userEmail);
+
+    try {
+        const user = await UserLogin.findByUserId(userEmail);
+        if (!user) {
+            console.log('❌ User not found for email:', userEmail);
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const profileId = user.profile_id;
+        if (!profileId) {
+            console.log('❌ Profile ID not found for user:', userEmail);
+            return res.status(400).json({ error: 'Profile ID not found for this user.' });
+        }
+
+        console.log('🟢 Found profile ID for user:', profileId);
+
+        const profile = await modifyProfileModel.getProfileById(profileId);
         if (!profile) {
             console.log('❌ Profile not found for ID:', profileId);
             return res.status(404).json({ error: 'Profile not found' });
         }
 
-        console.log('🟢 Retrieved profile data for ID:', profileId);
-        
-        // Map snake_case field names from database to camelCase for frontend
+        console.log('🟢 Raw DB profile data keys:', Object.keys(profile));
+
         const fieldMappings = {
-            // Map backend to frontend field names
             father_name: 'fatherName',
             mother_name: 'motherName',
             father_profession: 'fatherProfession',
@@ -136,48 +142,77 @@ const getOwnProfile = async (req, res) => {
             time_of_birth: 'timeOfBirth',
             charana_pada: 'charanaPada',
             sub_caste: 'subCaste',
-            // Add the previously missing field mappings
             alternate_phone: 'alternatePhone',
             communication_address: 'communicationAddress',
             residence_address: 'residenceAddress',
-            // Add additional field mappings that were missing
             annual_income: 'annualIncome',
             current_company: 'currentCompany',
             current_age: 'currentAge',
             working_status: 'workingStatus',
+            profile_created_for: 'profileCreatedFor',
+            profile_for: 'profileFor',
+            mother_tongue: 'motherTongue',
+            native_place: 'nativePlace',
+            current_location: 'currentLocation',
+            profile_status: 'profileStatus',
+            married_status: 'marriedStatus',
+            place_of_birth: 'placeOfBirth',
+            about_bride_groom: 'aboutBrideGroom',
+            reference1_name: 'reference1Name',
+            reference1_phone: 'reference1Phone',
+            reference2_name: 'reference2Name',
+            reference2_phone: 'reference2Phone',
+            how_did_you_know: 'howDidYouKnow',
+            profile_category: 'profileCategory',
+            profile_category_need: 'profileCategoryNeed',
+            share_details_on_platform: 'shareDetailsOnPlatform',
             height_feet: 'heightFeet',
             height_inches: 'heightInches'
         };
 
-        // Create a new response with properly mapped field names for frontend
         const mappedProfile = { ...profile };
-        
-        // Convert snake_case keys to camelCase for frontend
+
         Object.keys(fieldMappings).forEach(key => {
             if (profile[key] !== undefined) {
                 mappedProfile[fieldMappings[key]] = profile[key];
-                // Keep the original key for backward compatibility
+                console.log(`🟢 Mapping: ${key} → ${fieldMappings[key]} =`, profile[key]);
             }
         });
-        
-        // Log a few key fields to verify the data
-        console.log('🟢 Sample mapped profile data:', {
-            profile_id: mappedProfile.profile_id,
-            name: mappedProfile.name,
-            fatherName: mappedProfile.fatherName,
-            motherName: mappedProfile.motherName,
-            guruMatha: mappedProfile.guruMatha,
-            timeOfBirth: mappedProfile.timeOfBirth,
-            charanaPada: mappedProfile.charanaPada,
-            // Log the previously missing fields
-            alternatePhone: mappedProfile.alternatePhone,
-            communicationAddress: mappedProfile.communicationAddress,
-            residenceAddress: mappedProfile.residenceAddress,
-            // Log additional fields
-            annualIncome: mappedProfile.annualIncome,
-            currentCompany: mappedProfile.currentCompany,
-            currentAge: mappedProfile.currentAge,
-            workingStatus: mappedProfile.workingStatus
+
+        // Extract phone parts
+        const extractPhoneParts = (fullPhone = '') => {
+            const match = fullPhone.match(/^(\+\d{1,4})(\d+)$/);
+            if (match) {
+                console.log(`🟢 Split phone "${fullPhone}" into code="${match[1]}" and number="${match[2]}"`);
+                return { code: match[1], number: match[2] };
+            } else {
+                console.log(`⚠️ Could not split phone "${fullPhone}", returning raw`);
+                return { code: '', number: fullPhone };
+            }
+        };
+
+        const phoneFields = [
+            { full: 'reference1Phone', code: 'reference1CountryCode', number: 'reference1PhoneNumber' },
+            { full: 'reference2Phone', code: 'reference2CountryCode', number: 'reference2PhoneNumber' }
+        ];
+
+        phoneFields.forEach(({ full, code, number }) => {
+            const fullValue = mappedProfile[full];
+            if (fullValue) {
+                const parts = extractPhoneParts(fullValue);
+                mappedProfile[code] = parts.code;
+                mappedProfile[number] = parts.number;
+                console.log(`🟢 Added to mappedProfile → ${code}: ${parts.code}, ${number}: ${parts.number}`);
+            }
+        });
+
+        console.log('🟢 Final mapped profile fields:', Object.keys(mappedProfile));
+        console.log('🟢 Sample preview:', {
+            reference1Phone: mappedProfile.reference1Phone,
+            reference1CountryCode: mappedProfile.reference1CountryCode,
+            reference1PhoneNumber: mappedProfile.reference1PhoneNumber,
+            fatherProfession: mappedProfile.fatherProfession,
+            motherProfession: mappedProfile.motherProfession
         });
 
         res.status(200).json(mappedProfile);
@@ -187,5 +222,6 @@ const getOwnProfile = async (req, res) => {
     }
 };
 
-// Export both functions
+
+
 module.exports = { updateOwnProfile, getOwnProfile };
