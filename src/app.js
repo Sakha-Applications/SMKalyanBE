@@ -35,6 +35,9 @@ const guruMathaRoutes = require("./routes/guruMathaRoutes");
 // const paymentRoutes = require('./routes/paymentRoutes'); // Import payment routes
 require("dotenv").config();
 
+// Import the new direct update routes
+const directUpdateRoutes = require('./routes/directUpdateRoutes');
+
 const app = express();
 
 // Middleware
@@ -83,6 +86,8 @@ app.use('/api/preferred-profiles', preferredProfileRoutes);
 
 app.use('/api', educationRoutes);
 
+// Add this line with your other route middleware (after your existing routes)
+app.use('/api/direct', directUpdateRoutes);
 
 console.log('Contact Details routes mounted under /api'); // Add this log
 
