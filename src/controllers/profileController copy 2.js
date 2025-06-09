@@ -1,6 +1,5 @@
-// SMKalyanBE/src/controllers/profileController.js
-
 const { createProfile, fetchAllProfiles, getProfileById } = require("../models/profileModel");
+
 const { sendEmailReport } = require("../services/emailService");
 
 const getProfileByIdController = async (req, res) => {
@@ -8,8 +7,7 @@ const getProfileByIdController = async (req, res) => {
   console.log("🟡 req.params.id =", id, "| Type:", typeof id);
 
   try {
-    // ✅ Pass only the id string, not the entire req object
-    const profile = await getProfileById(id);
+    const profile = await getProfileById(id); // Make sure `id` is a string like 'SA19990'
     if (!profile) {
       return res.status(404).json({ message: "Profile not found" });
     }
@@ -19,6 +17,7 @@ const getProfileByIdController = async (req, res) => {
     return res.status(500).json({ message: "Server error" });
   }
 };
+
 
 // Add a new profile
 const addProfile = async (req, res) => {
@@ -104,17 +103,18 @@ const getAllProfiles = async (req, res) => {
     try {
         console.log("📥 Fetching all profiles...");
         const profiles = await fetchAllProfiles();
-        console.log("✅ Profiles fetched:", Array.isArray(profiles) ? profiles.length : 0);
-        // ✅ Fixed: Don't access profiles[0] if profiles is already the array
-        res.status(200).json(profiles);
+        console.log("✅ Profiles fetched:", Array.isArray(profiles[0]) ? profiles[0].length : 0);
+        res.status(200).json(profiles[0]);
     } catch (error) {
         console.error("❌ Error fetching all profiles:", error);
         res.status(500).json({ error: "Failed to fetch profiles", details: error.message });
     }
 };
 
+
+
 module.exports = {
   addProfile,
   getAllProfiles,
-  getProfileByIdController, // ✅ Export the correct function name
+  getProfileById, // ✅ Export this
 };
