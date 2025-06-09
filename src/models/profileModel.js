@@ -70,7 +70,6 @@ const createProfile = async (formData) => {
   )
 `;
 
-
   const values = [
     profileId, name, profileCreatedFor, profileFor, motherTongue,
     nativePlace, currentLocation, profileStatus, marriedStatus, gotra, guruMatha,
@@ -103,7 +102,6 @@ const createProfile = async (formData) => {
   }
 };
 
-
 // Fetch all profiles (ensure this also includes the new fields if you ever fetch them)
 const fetchAllProfiles = async () => {
   const query = `SELECT * FROM profile ORDER BY created_at DESC`;
@@ -117,4 +115,32 @@ const fetchAllProfiles = async () => {
   }
 };
 
-module.exports = { createProfile, fetchAllProfiles };
+// ✅ Fixed getProfileById function
+const getProfileById = async (profileId) => {
+  console.log("🔵 getProfileById called with:", profileId, "| Type:", typeof profileId);
+  
+  // ✅ Add validation to ensure profileId is a string
+  if (!profileId || typeof profileId !== 'string') {
+    console.error("❌ Invalid profileId received:", profileId, "Type:", typeof profileId);
+    throw new Error('Invalid profile ID provided');
+  }
+
+  const query = "SELECT * FROM profile WHERE profile_id = ?";
+  
+  try {
+    // ✅ Ensure we're passing only the profileId string, not an object
+    const [rows] = await db.query(query, [profileId.toString()]);
+    console.log("🔍 Query executed. Rows found:", rows.length);
+    return rows[0] || null;
+  } catch (error) {
+    console.error("❌ Error in getProfileById model:", error);
+    console.error("❌ ProfileId that caused error:", profileId);
+    throw error;
+  }
+};
+
+module.exports = {
+  createProfile,
+  fetchAllProfiles,
+  getProfileById
+};
