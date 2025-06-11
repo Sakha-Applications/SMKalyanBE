@@ -71,6 +71,7 @@ const fieldMappings = {
   manglikStatus: 'manglik_status',
 
   // Partner Preferences
+   expectations: 'expectations', // ✅ Add this line
   ageRange: 'age_range',
   heightRange: 'height_range',
   preferredIncomeRange: 'preferred_income_range',
