@@ -110,7 +110,7 @@ const fetchAllProfiles = async () => {
     const [rows] = await db.query(query);
     return rows;
   } catch (error) {
-    console.error("❌ Azure MySQL error during fetchAllProfiles:", error);
+      console.error("❌ Azure MySQL error during fetchAllProfiles:", error);
     throw error;
   }
 };
