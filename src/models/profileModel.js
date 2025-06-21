@@ -7,7 +7,7 @@ const createProfile = async (formData) => {
 
   const {
     profileId, name, profileCreatedFor, profileFor, motherTongue,
-    nativePlace, currentLocation, profileStatus, marriedStatus, gotra, guruMatha,
+    nativePlace, currentLocationState, currentLocationCountry,currentLocation, profileStatus, marriedStatus, gotra, guruMatha,
     dob, timeOfBirth, currentAge, subCaste,
     placeOfBirth,
     rashi, height,
@@ -34,7 +34,7 @@ const createProfile = async (formData) => {
   const query = `
   INSERT INTO profile (
     profile_id, name, profile_created_for, profile_for, mother_tongue,
-    native_place, current_location, profile_status, married_status, gotra, guru_matha,
+    native_place,current_location_state, current_location_country, current_location, profile_status, married_status, gotra, guru_matha,
     dob, time_of_birth, current_age, sub_caste, place_of_birth,
     rashi, height, nakshatra, charana_pada, email, phone, alternate_phone,
     communication_address, residence_address, father_name, father_profession,
@@ -53,7 +53,7 @@ const createProfile = async (formData) => {
     preferred_gotras, preferred_nakshatras, preferred_rashis, preferred_native_origins,
     preferred_cities, preferred_countries, preferred_diet, preferred_professions, preferred_hobbies
   ) VALUES (
-    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?,?,
     ?, ?, ?, ?, ?,
     ?, ?, ?, ?, ?, ?, ?,
     ?, ?, ?, ?, ?,
@@ -72,7 +72,7 @@ const createProfile = async (formData) => {
 
   const values = [
     profileId, name, profileCreatedFor, profileFor, motherTongue,
-    nativePlace, currentLocation, profileStatus, marriedStatus, gotra, guruMatha,
+    nativePlace, currentLocationState, currentLocationCountry,currentLocation, profileStatus, marriedStatus, gotra, guruMatha,
     dob, timeOfBirth, currentAge, subCaste, placeOfBirth,
     rashi, height, nakshatra, charanaPada, email, phone, alternatePhone,
     communicationAddress, residenceAddress, fatherName, fatherProfession,
@@ -88,8 +88,11 @@ const createProfile = async (formData) => {
     ageRange?.join('-'), heightRange?.join('-'), preferredIncomeRange?.join('-'), preferredEducation?.join(','),
     preferredMotherTongues?.join(','), preferredMaritalStatus, preferredBrideGroomCategory,
     preferredManglikStatus, preferredSubCastes?.join(','), preferredGuruMathas?.join(','),
-    preferredGotras?.join(','), preferredNakshatras?.join(','), preferredRashis?.join(','), preferredNativeOrigins?.join(','),
-    preferredCities?.join(','), preferredCountries?.join(','), preferredDiet?.join(','), preferredProfessions?.join(','), preferredHobbies?.join(',')
+    preferredGotras?.join(','), preferredNakshatras?.join(','), preferredRashis?.join(','), 
+    preferredNativeOrigins ? JSON.stringify(preferredNativeOrigins) : null,
+preferredCities ? JSON.stringify(preferredCities) : null,
+ 
+    preferredCountries?.join(','), preferredDiet?.join(','), preferredProfessions?.join(','), preferredHobbies?.join(',')
   ];
 
   try {
