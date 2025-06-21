@@ -47,11 +47,18 @@ const fieldMappings = {
   profileCreatedFor: 'profile_created_for',
   profileFor: 'profile_for',
   motherTongue: 'mother_tongue',
-  nativePlace: 'native_place',
+  nativePlaceState: 'native_place_state',
+nativePlaceCountry: 'native_place_country',
+nativePlace: 'native_place',
+currentLocationState: 'current_location_state',
+currentLocationCountry: 'current_location_country',
+
   currentLocation: 'current_location',
   profileStatus: 'profile_status',
   marriedStatus: 'married_status',
-  placeOfBirth: 'place_of_birth',
+  placeOfBirthState: 'place_of_birth_state',
+placeOfBirthCountry: 'place_of_birth_country',
+placeOfBirth: 'place_of_birth',
   aboutBrideGroom: 'about_bride_groom',
   reference1Name: 'reference1_name',
   reference1Phone: 'reference1_phone',
@@ -90,6 +97,12 @@ const fieldMappings = {
   preferredCountries: 'preferred_countries',
   preferredDiet: 'preferred_diet',
   preferredProfessions: 'preferred_professions',
+  guardianPhone: 'guardian_phone', // Add this
+  noOfBrothers: 'no_of_brothers', // Add this
+  noOfSisters: 'no_of_sisters',   // Add this
+  familyStatus: 'family_status',   // Add this
+  familyType: 'family_type',     // Add this
+  familyValues: 'family_values',   // Add this
   preferredHobbies: 'preferred_hobbies'
 };
 
@@ -97,9 +110,19 @@ const fieldMappings = {
 // Convert arrays to comma-separated strings for DB
 Object.keys(profileData).forEach(key => {
   if (Array.isArray(profileData[key])) {
-    console.log(`🔄 Flattening array field ${key}:`, profileData[key]);
+  if (
+    profileData[key].length > 0 &&
+    typeof profileData[key][0] === 'object' &&
+    profileData[key][0] !== null
+  ) {
+    // ✅ Array of objects (like preferredNativeOrigins)
+    profileData[key] = JSON.stringify(profileData[key]);
+  } else {
+    // Simple array of strings
     profileData[key] = profileData[key].join(',');
   }
+}
+
 });
 
     // Create mapped profile data
