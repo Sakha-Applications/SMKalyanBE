@@ -82,14 +82,10 @@ const getPhotos = async (req, res) => {
       ? await uploadPhotosModel.getPhotosByProfileId(profileId)
       : await uploadPhotosModel.getPhotosByEmail(email);
 
-// --- APPLY THIS TRANSFORMATION ---
     const processedPhotos = photos.map(photo => ({
-      id: photo.photo_id, // Map 'photo_id' from DB to 'id' for frontend
-      fullUrl: photo.photo_path || photo.url_path, // Use photo_path (or url_path) for fullUrl
-      blobName: photo.filename, // Map 'filename' from DB to 'blobName' for frontend
-      isDefault: photo.is_default === 1 || photo.is_default === true // Convert TINYINT to boolean
+      ...photo,
+      url: photo.url_path || photo.photo_path
     }));
-    // ---------------------------------
 
     res.json(processedPhotos);
   } catch (error) {
@@ -104,14 +100,8 @@ const getDefaultPhoto = async (req, res) => {
 
     const photo = await uploadPhotosModel.getDefaultPhoto(profileId);
     if (photo) {
-    // --- APPLY THIS TRANSFORMATION ---
-      const formattedPhoto = {
-        id: photo.photo_id, // Map 'photo_id' from DB to 'id' for frontend
-        fullUrl: photo.photo_path || photo.url_path, // Use photo_path (or url_path) for fullUrl
-        blobName: photo.filename // Map 'filename' from DB to 'blobName' for frontend
-      };
-      res.json(formattedPhoto);
-      // ---------------------------------
+      const url = photo.url_path || photo.photo_path;
+      res.json({ ...photo, url });
     } else {
       res.status(404).json({ message: "No default photo found for this profile." });
     }
