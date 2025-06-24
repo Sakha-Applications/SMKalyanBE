@@ -1,21 +1,49 @@
-//backend/src/controllers/ProfileSearchController.js
+// backend/src/controllers/profilesearchController.js
 
+const ProfileSearchModel = require("../models/ProfileSearchModel"); //
 
-const ProfileSearchModel = require("../models/ProfileSearchModel");
-
-console.log("✅ ProfileSearchController.js loaded");
+console.log("✅ ProfileSearchController.js loaded"); //
 
 const searchProfiles = async (req, res) => {
-    console.log("🔍 searchProfiles function is being called");
+    console.log("🔍 searchProfiles function is being called"); //
     try {
-        const { profileFor, minAge, maxAge, gotra } = req.query;
+        // Extract all search parameters from the request body
+        // These names must match the keys in your frontend's searchQuery state
+        const {
+            profileId,
+            profileFor,
+            minAge,
+            maxAge,
+            maritalStatus,
+            motherTongue,
+            gotra,
+            subCaste,
+            guruMatha,
+            currentCityOfResidence, // This corresponds to current_location in DB
+            income,
+            traditionalValues   // This corresponds to family_values in DB
+        } = req.body; // Changed from req.query to req.body
 
-        const profiles = await ProfileSearchModel.searchProfiles(profileFor, minAge, maxAge, gotra);
+        // Pass all extracted parameters to the model function
+        const profiles = await ProfileSearchModel.searchProfiles(
+            profileId,
+            profileFor,
+            minAge,
+            maxAge,
+            maritalStatus,
+            motherTongue,
+            gotra,
+            subCaste,
+            guruMatha,
+            currentCityOfResidence,
+            income,
+            traditionalValues
+        );
         res.json(profiles);
     } catch (error) {
-        console.error("❌ Error searching profiles in controller:", error);
-        res.status(500).json({ error: "Internal Server Error" });
+        console.error("❌ Error searching profiles in controller:", error); //
+        res.status(500).json({ error: "Internal Server Error" }); //
     }
 };
 
-module.exports = { searchProfiles };
+module.exports = { searchProfiles }; //

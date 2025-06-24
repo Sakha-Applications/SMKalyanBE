@@ -1,7 +1,7 @@
 // controllers/uploadPhotosController.js
 const uploadPhotosModel = require("../models/uploadPhotosModel");
 const fs = require("fs");
-const { uploadToAzure, deleteFromAzure } = require("../utils/azureBlobHelper");
+const { uploadFileToAzureBlob, deleteFileFromAzureBlob, ensureContainerExists} = require("../services/azureBlobService"); // Corrected import path
 
 const uploadPhotos = async (req, res) => {
   try {
@@ -24,14 +24,19 @@ const uploadPhotos = async (req, res) => {
 
     const savedPhotoPaths = [];
 
+    // Ensure the container exists before attempting uploads
+    await ensureContainerExists();
+
     await Promise.all(uploadedFiles.map((file, index) => {
       return new Promise(async (resolve, reject) => {
         try {
-          const blobName = `profile_${profile_id}_${index + 1}.jpg`;
+          // Construct a more robust blobName to avoid potential conflicts and ensure uniqueness
+          // Consider adding a timestamp or a UUID if multiple uploads per profile are frequent
+          const blobName = `profile_${profile_id}_${Date.now()}_${index + 1}.jpg`; 
           const buffer = fs.readFileSync(file.tempFilePath);
-          const azureUrl = await uploadToAzure(buffer, blobName, file.mimetype);
+          const azureUrl = await uploadFileToAzureBlob(blobName, buffer, file.mimetype);
 
-          const photoId = await uploadPhotosModel.savePhotoPath(
+          const photoId = await uploadPhotosModel.savePhotoPath( // Corrected function call
             profile_id,
             email,
             azureUrl, // full Azure blob URL
@@ -47,7 +52,16 @@ const uploadPhotos = async (req, res) => {
           });
           resolve();
         } catch (err) {
+          // Log the specific error during file processing/upload
+          console.error(`Error processing file ${file.name}:`, err);
           reject(err);
+        } finally {
+          // Clean up temporary file regardless of success or failure
+          if (file.tempFilePath) {
+            fs.unlink(file.tempFilePath, (err) => {
+              if (err) console.error("Error deleting temp file:", err);
+            });
+          }
         }
       });
     }));
@@ -104,11 +118,13 @@ const deletePhoto = async (req, res) => {
     const photo = await uploadPhotosModel.getPhotoById(photoId);
     if (!photo) return res.status(404).json({ error: "Photo not found." });
 
-    await deleteFromAzure(photo.filename);
+    // Use deleteFileFromAzureBlob from the service
+    await deleteFileFromAzureBlob(photo.filename); 
     await uploadPhotosModel.deletePhoto(photoId);
 
     res.json({ message: "Photo deleted successfully." });
   } catch (error) {
+    console.error("Error deleting photo:", error); // Added more specific logging
     res.status(500).json({ error: "Failed to delete photo.", details: error.message });
   }
 };
