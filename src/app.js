@@ -7,6 +7,7 @@ const gotraRoutes = require("./routes/gotraRoutes");
 const rashiRoutes = require("./routes/rashiRoutes");
 const nakshatraRoutes = require("./routes/nakshatraRoutes");
 const profilesearchRoutes = require("./routes/profilesearchRoutes");
+const advancedSearchRoutes = require('./routes/advancedsearchRoutes');
 const uploadSearchRoutes = require("./routes/uploadSearchRoute");
 const contactDetailsRoutes = require("./routes/contactDetailsRoutes"); // Add this line
 const testRoutes = require('./routes/test');
@@ -62,6 +63,7 @@ app.use("/api", rashiRoutes);
 app.use("/api", nakshatraRoutes);
 app.use("/api", profilesearchRoutes);
 app.use("/api", uploadSearchRoutes);
+app.use("/api", advancedSearchRoutes); // Use the new routes
 app.use("/api", uploadPhotosRoutes);
 app.use("/api", contactDetailsRoutes); // Add this line
 app.use('/test', testRoutes);
