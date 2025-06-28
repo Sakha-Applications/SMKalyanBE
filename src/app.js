@@ -22,6 +22,7 @@ const path = require('path');
 // Import the profession routes
 const professionRoutes = require("./routes/professionRoutes");
 
+const matchProfilesRoutes = require('./routes/matchProfilesRoutes'); 
 // Add this to your app.js file
 const offlinePaymentRoutes = require("./routes/offlinePaymentRoutes");
 
@@ -76,6 +77,8 @@ app.use("/api", guruMathaRoutes);
 
 // Use the profession routes
 app.use("/api", professionRoutes);
+
+app.use("/api", matchProfilesRoutes);
 
 // Add this with your other app.use statements
 app.use("/api", offlinePaymentRoutes);

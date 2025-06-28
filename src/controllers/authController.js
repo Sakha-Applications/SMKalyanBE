@@ -75,7 +75,19 @@ const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
     // Authentication successful, generate a token
-    const token = jwt.sign({ userId: user.user_id }, 'your-secret-key', { expiresIn: '8h' }); // Replace 'your-secret-key' with a strong, secret key
+    const secret = process.env.JWT_SECRET || 'your-secret-key';
+
+const token = jwt.sign(
+  {
+    profile_id: user.profile_id,     // ✅ required by matchProfiles
+    email: user.user_id,             // treating user_id as email
+    userId: user.user_id,            // legacy fallback
+    role: user.role || 'USER'        // used by isAdmin.js
+  },
+  secret,
+  { expiresIn: '8h' }
+);
+
 
     // Include user data in the response
     console.log("Sending login success response:", { token, user });  // DEBUG
