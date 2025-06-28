@@ -56,7 +56,9 @@ const findMatchingProfiles = async (preferredCriteria, loggedInUserProfileId, db
         name,
         mother_tongue,
         gotra,
-        current_age
+        current_age,
+        current_location,
+        height
       FROM profile
       WHERE profile_id != ?
         AND profile_for != ?

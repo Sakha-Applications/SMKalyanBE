@@ -35,6 +35,10 @@ const preferredProfileRoutes = require('./routes/preferredProfileRoutes');
 
 const guruMathaRoutes = require("./routes/guruMathaRoutes");
 // const paymentRoutes = require('./routes/paymentRoutes'); // Import payment routes
+
+// NEW: Import InvitationRoutes
+const invitationRoutes = require('./routes/InvitationRoutes'); // <--- ADD THIS LINE
+
 require("dotenv").config();
 
 // Import the new direct update routes
@@ -90,6 +94,9 @@ app.use("/api", designationRoutes);
 app.use('/api/preferred-profiles', preferredProfileRoutes);
 
 app.use('/api', educationRoutes);
+
+// NEW: Use the InvitationRoutes
+app.use('/api', invitationRoutes); // <--- ADD THIS LINE
 
 // Add this line with your other route middleware (after your existing routes)
 app.use('/api/direct', directUpdateRoutes);

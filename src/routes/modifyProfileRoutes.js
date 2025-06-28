@@ -18,9 +18,17 @@ const getProfileRouteHandler = (req, res) => {
   modifyProfileController.getOwnProfile(req, res);
 };
 
+// NEW: Define the route handler function for fetching by ID
+const getProfileByIdRouteHandler = (req, res) => { // <--- ADD THIS FUNCTION
+  modifyProfileController.getProfileByIdHandler(req, res);
+};
+
 // Define the routes
 router.put('/modifyProfile', authenticate, updateProfileRouteHandler);
-router.get('/modifyProfile', authenticate, getProfileRouteHandler); // Add this GET route
+router.get('/modifyProfile', authenticate, getProfileRouteHandler);
+
+// NEW: Add this GET route for fetching profiles by ID
+router.get('/modifyProfile/byId', authenticate, getProfileByIdRouteHandler); // <--- ADD THIS ROUTE
 
 // Export the router
 module.exports = router;

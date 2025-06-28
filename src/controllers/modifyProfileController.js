@@ -414,4 +414,47 @@ const getOwnProfile = async (req, res) => {
     }
 };
 
-module.exports = { updateOwnProfile, getOwnProfile };
+/**
+ * Fetches a profile by its ID, intended for viewing other profiles.
+ * Requires authentication.
+ */
+const getProfileByIdHandler = async (req, res) => {
+    // Expect profileId to be passed as a query parameter (e.g., /api/modifyProfile/byId?profileId=XYZ)
+    const { profileId } = req.query; 
+
+    console.log('🟢 getProfileByIdHandler called for profile ID:', profileId);
+
+    if (!profileId) {
+        return res.status(400).json({ error: 'Profile ID is required.' });
+    }
+
+    const token = req.headers.authorization?.split(' ')[1]; // Extract token for logging/validation if needed
+    if (!token) {
+        return res.status(401).json({ error: 'Authentication token missing.' });
+    }
+
+    try {
+        // Use the model to fetch the profile directly by the provided profileId
+        const profile = await modifyProfileModel.getProfileById(profileId);
+
+        if (!profile) {
+            console.log('❌ Profile not found for ID:', profileId);
+            return res.status(404).json({ error: 'Profile not found.' });
+        }
+
+        console.log('🟢 Successfully fetched profile for ID:', profileId);
+        // We're returning the raw profile data from the DB for simplicity.
+        // If frontend expects camelCase, you'd apply mapping here similar to getOwnProfile.
+        // For ViewModeProfile, it likely expects snake_case for many fields directly from DB.
+        res.status(200).json(profile);
+
+    } catch (error) {
+        console.error('❌ Error in getProfileByIdHandler:', error);
+        res.status(500).json({ error: 'Internal server error', details: error.message });
+    }
+};
+
+// You'll need to export this new function.
+// Update your module.exports line to include getProfileByIdHandler
+module.exports = { updateOwnProfile, getOwnProfile, getProfileByIdHandler }; // <-- UPDATE THIS LINE
+
