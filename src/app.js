@@ -31,6 +31,8 @@ const designationRoutes = require("./routes/designationRoutes");
 
 const educationRoutes = require('./routes/educationRoutes'); // Adjust the path if needed
 
+const accountAvailabilityRoutes = require('./routes/accountAvailabilityRoutes');
+
 const preferredProfileRoutes = require('./routes/preferredProfileRoutes');
 
 const guruMathaRoutes = require("./routes/guruMathaRoutes");
@@ -94,6 +96,8 @@ app.use("/api", designationRoutes);
 app.use('/api/preferred-profiles', preferredProfileRoutes);
 
 app.use('/api', educationRoutes);
+
+app.use('/api', accountAvailabilityRoutes);
 
 // NEW: Use the InvitationRoutes
 app.use('/api', invitationRoutes); // <--- ADD THIS LINE
