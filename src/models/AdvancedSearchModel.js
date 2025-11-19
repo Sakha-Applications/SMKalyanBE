@@ -1,6 +1,33 @@
 // backend/src/models/AdvancedSearchModel.js
 const pool = require("../config/db"); // Ensure this path is correct for your DB connection
 
+// Utility: Convert height string like "5'4\"" or "5' 4\"" to total inches
+const parseHeightToInches = (heightStr) => {
+    if (!heightStr) return null;
+
+    const s = String(heightStr).trim();
+
+    // Pattern: 5'4", 5' 4", 5 '4", etc.
+    const ftInPattern = /^(\d+)\s*'?\s*(\d{1,2})?\s*"?$/;
+    const match = s.match(ftInPattern);
+
+    if (match) {
+        const feet = parseInt(match[1], 10);
+        const inches = match[2] ? parseInt(match[2], 10) : 0;
+        return feet * 12 + inches;
+    }
+
+    // Fallback: handle formats like "5.4" (interpret .4 as inches 4)
+    const num = parseFloat(s);
+    if (!isNaN(num)) {
+        const feet = Math.floor(num);
+        const inches = Math.round((num - feet) * 10); // e.g. 5.4 → 5 ft 4 in
+        return feet * 12 + inches;
+    }
+
+    return null; // Unknown format
+};
+
 const searchProfiles = async (
     profileId,
     profileFor,
@@ -104,7 +131,7 @@ const searchProfiles = async (
 
         // --- Add conditions for NEW ADVANCED SEARCH FIELDS (placeholders) ---
         // These will be expanded in future steps based on your DB schema.
-        if (heightMin) {
+/*        if (heightMin) {
             // Placeholder: Assume DB column for height, e.g., 'height_inches'
             query += ` AND height_inches >= ?`;
             values.push(parseFloat(heightMin) * 12); // Example conversion: feet.inches to inches
@@ -114,7 +141,12 @@ const searchProfiles = async (
             query += ` AND height_inches <= ?`;
             values.push(parseFloat(heightMax) * 12); // Example conversion: feet.inches to inches
         }
-        if (qualification) {
+
+*/
+
+
+
+if (qualification) {
             query += ` AND qualification = ?`; // Placeholder DB column
             values.push(qualification);
         }
@@ -164,12 +196,42 @@ const searchProfiles = async (
         }
         // --- END NEW ADVANCED SEARCH FIELDS ---
 
-        query += ` ORDER BY current_age ASC`; // Default sorting
+/*        query += ` ORDER BY current_age ASC`; // Default sorting
 
         console.log("Executing Advanced Search query:", query, "with values:", values);
         const [rows] = await pool.execute(query, values); // Use pool.execute for MySQL
         return rows;
-    } catch (error) {
+  */
+ query += ` ORDER BY current_age ASC`; // Default sorting
+
+console.log("Executing Advanced Search query:", query, "with values:", values);
+const [rows] = await pool.execute(query, values); // Use pool.execute for MySQL
+
+// --- Post-filter by height using existing `height` column --- //
+let finalRows = rows;
+
+if (heightMin || heightMax) {
+    const minInches = heightMin ? parseHeightToInches(heightMin) : null;
+    const maxInches = heightMax ? parseHeightToInches(heightMax) : null;
+
+    finalRows = rows.filter((profile) => {
+        const profileInches = parseHeightToInches(profile.height);
+
+        // If height filter is applied and profile has no valid height, exclude it
+        if (profileInches == null) {
+            return false;
+        }
+        if (minInches !== null && profileInches < minInches) return false;
+        if (maxInches !== null && profileInches > maxInches) return false;
+
+        return true;
+    });
+}
+
+// Return filtered result set
+return finalRows;
+
+        } catch (error) {
         console.error("❌ Error searching profiles in advanced search model:", error);
         throw error; // Re-throw the error for the controller to handle
     }
