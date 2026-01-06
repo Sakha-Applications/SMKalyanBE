@@ -1,84 +1,119 @@
 // backend/src/controllers/advancedsearchController.js
 
-const AdvancedSearchModel = require("../models/AdvancedSearchModel"); // Using the new model
+const AdvancedSearchModel = require("../models/AdvancedSearchModel");
 
-console.log("✅ AdvancedSearchController.js loaded"); // Log for debugging
+console.log("✅ AdvancedSearchController.js loaded");
+
+const isBlank = (v) => v === null || v === undefined || String(v).trim() === "";
 
 const advancedSearchProfiles = async (req, res) => {
-    console.log("🔍 advancedSearchProfiles function is being called with request body:", req.body); // Log the request body
-    try {
-        // Extract ALL search parameters from the request body.
-        // These names MUST match the keys in your frontend's searchQuery state
-        // in AdvancedSearchForm.jsx.
-        const {
-            profileId,
-            profileFor,
-            minAge,
-            maxAge,
-            maritalStatus,
-            motherTongue,
-            gotra,
-            subCaste,
-            guruMatha,
-            currentCityOfResidence, // Corresponds to current_location in DB
-            income,
-            traditionalValues, // Corresponds to family_values in DB
-            // --- Placeholders for NEW ADVANCED SEARCH FIELDS ---
-            heightMin,
-            heightMax,
-            qualification,
-            educationIn,
-            workingWith,
-            professionalArea,
-            familyStatus,
-            familyType,
-            religiousValues,
-            castingDetails,
-            faithLiving,
-            dailyRituals,
-            observersRajamanta,
-            observersChaturmasya
-            // --- END of Placeholders ---
-        } = req.body;
+  console.log("🔍 advancedSearchProfiles called. RAW BODY:", req.body);
 
-        // Pass ALL extracted parameters to the new model function.
-        // Even if a field is empty/null from the frontend, it will be passed,
-        // and the model will conditionally add it to the query.
-        const profiles = await AdvancedSearchModel.searchProfiles(
-            profileId,
-            profileFor,
-            minAge,
-            maxAge,
-            maritalStatus,
-            motherTongue,
-            gotra,
-            subCaste,
-            guruMatha,
-            currentCityOfResidence,
-            income,
-            traditionalValues,
-            // --- Pass NEW ADVANCED SEARCH FIELDS ---
-            heightMin,
-            heightMax,
-            qualification,
-            educationIn,
-            workingWith,
-            professionalArea,
-            familyStatus,
-            familyType,
-            religiousValues,
-            castingDetails,
-            faithLiving,
-            dailyRituals,
-            observersRajamanta,
-            observersChaturmasya
-            // --- END NEW ADVANCED SEARCH FIELDS ---
-        );
-        res.json(profiles); // Send the search results back to the frontend
-    } catch (error) {
-        console.error("❌ Error searching profiles in advanced search controller:", error); // Log the specific error
-        res.status(500).json({ error: "Internal Server Error" }); // Send a generic error response
+  try {
+    const {
+      profileId,
+      profileFor,
+      minAge,
+      maxAge,
+      maritalStatus,
+      motherTongue,
+      gotra,
+      subCaste,
+      guruMatha,
+      currentCityOfResidence,
+      income,
+      traditionalValues,
+
+      heightMin,
+      heightMax,
+      qualification,
+      educationIn,
+      workingWith,
+      professionalArea,
+      familyStatus,
+      familyType,
+      religiousValues,
+      castingDetails,
+      faithLiving,
+      dailyRituals,
+      observersRajamanta,
+      observersChaturmasya,
+
+      // ✅ NEW (from UI)
+      myProfileId,
+      myProfileFor: myProfileForFromBody,
+    } = req.body || {};
+
+    console.log("🧾 ADV SEARCH myProfileId(from body):", myProfileId || "(EMPTY)");
+    console.log("🧾 ADV SEARCH myProfileFor(from body):", myProfileForFromBody || "(EMPTY)");
+
+    // ✅ Determine applyOppositeByDefault based on UI selection
+    const uiProfileFor = String(profileFor || "").trim();
+    const applyOppositeByDefault = isBlank(uiProfileFor);
+
+    console.log("🧾 ADV SEARCH profileFor(from UI):", uiProfileFor || "(EMPTY)");
+    console.log("🧾 ADV SEARCH applyOppositeByDefault:", applyOppositeByDefault);
+
+    // ✅ Resolve myProfileFor (server-side)
+    let myProfileFor = String(myProfileForFromBody || "").trim();
+
+    if (isBlank(myProfileFor) && !isBlank(myProfileId)) {
+      console.log("⚠️ ADV SEARCH myProfileFor missing -> fetching from DB using myProfileId...");
+      try {
+        const dbProfileFor = await AdvancedSearchModel.getProfileForByProfileId(myProfileId);
+        myProfileFor = String(dbProfileFor || "").trim();
+        console.log("🧾 ADV SEARCH myProfileFor(from DB):", myProfileFor || "(EMPTY)");
+      } catch (e) {
+        console.log("❌ ADV SEARCH DB lookup failed:", e?.message || e);
+      }
     }
+
+    console.log("🧾 ADV SEARCH myProfileFor(final):", myProfileFor || "(EMPTY)");
+
+    if (applyOppositeByDefault) {
+      console.log("✅ ADV SEARCH default-opposite requested. Expect SQL: AND profile_for != myProfileFor");
+    }
+
+    const profiles = await AdvancedSearchModel.searchProfiles(
+      profileId || "",
+      uiProfileFor || "",
+      minAge || "",
+      maxAge || "",
+      maritalStatus || "",
+      motherTongue || "",
+      gotra || "",
+      subCaste || "",
+      guruMatha || "",
+      currentCityOfResidence || "",
+      income || "",
+      traditionalValues || "",
+
+      heightMin || "",
+      heightMax || "",
+      qualification || "",
+      educationIn || "",
+      workingWith || "",
+      professionalArea || "",
+      familyStatus || "",
+      familyType || "",
+      religiousValues || "",
+      castingDetails || "",
+      faithLiving || "",
+      dailyRituals || "",
+      observersRajamanta || "",
+      observersChaturmasya || "",
+
+      // ✅ NEW (end args)
+      myProfileFor || "",
+      applyOppositeByDefault
+    );
+
+    console.log(`✅ ADV SEARCH results count: ${profiles.length}`);
+    res.json(profiles);
+  } catch (error) {
+    console.error("❌ Error in advanced search controller:", error);
+    res.status(500).json({ error: "Internal Server Error", details: error.message });
+  }
 };
 
-module.exports = { advancedSearchProfiles }; // Export the new function
+module.exports = { advancedSearchProfiles };
