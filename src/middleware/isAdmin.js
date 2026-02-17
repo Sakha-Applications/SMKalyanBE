@@ -1,14 +1,15 @@
-
 // middleware/isAdmin.js
 const isAdmin = (req, res, next) => {
-    // Check if user exists and has admin role
-    if (!req.user || req.user.role !== 'admin') {
-        return res.status(403).json({ 
-            success: false, 
-            message: 'Access denied: Admin privileges required' 
-        });
-    }
-    next();
+  const role = (req.user?.role || '').toString().toLowerCase();
+
+  if (role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Access denied: Admin privileges required'
+    });
+  }
+
+  next();
 };
 
 module.exports = isAdmin;

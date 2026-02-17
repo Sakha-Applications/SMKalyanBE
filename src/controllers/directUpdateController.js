@@ -138,7 +138,17 @@ Object.keys(profileData).forEach(key => {
         }
     });
 
+
     console.log('🟢 Processed profile data for direct update:', JSON.stringify(mappedProfileData, null, 2));
+
+    // ✅ Prevent accidental blank profile_status overwrite
+if (Object.prototype.hasOwnProperty.call(mappedProfileData, 'profile_status')) {
+  const s = mappedProfileData.profile_status;
+  if (s === undefined || s === null || (typeof s === 'string' && s.trim() === '')) {
+    console.log('🟡 Removing blank profile_status from update payload to prevent overwrite');
+    delete mappedProfileData.profile_status;
+  }
+}
 
     try {
         // Use existing modifyProfileModel to update the profile

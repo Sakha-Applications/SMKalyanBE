@@ -142,8 +142,29 @@ const getProfileById = async (profileId) => {
   }
 };
 
+// ✅ Get current profile_status
+const getProfileStatus = async (profileId) => {
+  const [rows] = await db.query(
+    "SELECT profile_status FROM profile WHERE profile_id = ?",
+    [profileId.toString()]
+  );
+  return rows?.[0]?.profile_status || null;
+};
+
+// ✅ Update profile_status (single column update)
+const updateProfileStatus = async (profileId, newStatus) => {
+  const [result] = await db.query(
+    "UPDATE profile SET profile_status = ? WHERE profile_id = ?",
+    [newStatus, profileId.toString()]
+  );
+  return result?.affectedRows > 0;
+};
+
+
 module.exports = {
   createProfile,
   fetchAllProfiles,
-  getProfileById
+  getProfileById,
+  getProfileStatus,
+  updateProfileStatus
 };

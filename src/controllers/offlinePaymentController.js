@@ -19,7 +19,8 @@ const submitOfflinePayment = async (req, res) => {
         } = req.body;
         
         // Get user ID from authentication middleware
-        const profile_id = req.body.profile_id || req.user?.id;
+        const profile_id = req.body.profile_id || req.user?.profile_id || req.user?.id;
+
         console.log("🔄 profile_id from body:", req.body.profile_id);
         console.log("🔄 payment_type:", payment_type);
         
@@ -76,6 +77,24 @@ const submitOfflinePayment = async (req, res) => {
                 transactionDetails: req.body.transactionDetails
             });
             
+            // ✅ Update profile status to PAYMENT_SUBMITTED (do not downgrade APPROVED)
+const { getProfileStatus, updateProfileStatus } = require('../models/profileModel');
+
+try {
+  const current = (await getProfileStatus(profile_id)) || '';
+  const currentU = current.toString().trim().toUpperCase();
+
+  if (currentU !== 'APPROVED') {
+    // Allow transition from DRAFT/SUBMITTED to PAYMENT_SUBMITTED
+    await updateProfileStatus(profile_id, 'PAYMENT_SUBMITTED');
+    console.log(`✅ profile_status updated to PAYMENT_SUBMITTED for profile_id=${profile_id}`);
+  } else {
+    console.log(`ℹ️ profile_id=${profile_id} already APPROVED. Skipping status update.`);
+  }
+} catch (e) {
+  console.error('⚠️ Failed to update profile_status to PAYMENT_SUBMITTED:', e.message);
+}
+
             // Return success response for regular payments
             return res.status(201).json({
                 success: true,
@@ -97,7 +116,8 @@ const submitOfflinePayment = async (req, res) => {
 // Get payment history for the logged-in user
 const getUserOfflinePayments = async (req, res) => {
     try {
-        const profileId = req.user.id;
+        const profileId = req.user?.profile_id || req.user?.id;
+
         const payments = await getOfflinePaymentsByProfileId(profileId);
         
         res.json({

@@ -40,11 +40,19 @@ const updateProfile = async (profileId, profileData) => {
     return value !== undefined ? value : null;
   }
 
+  function sanitizeStatus(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  return value;
+}
+
+
   const query = `
     UPDATE profile SET
       name = ?, profile_created_for = ?, profile_for = ?, mother_tongue = ?,
       native_place = ?, native_place_state = ?, native_place_country = ?, current_location_state = ?, current_location_country = ?,
-      current_location = ?, profile_status = ?, married_status = ?, gotra = ?, guru_matha = ?,
+      current_location = ?, profile_status = COALESCE(?, profile_status), married_status = ?, 
+      gotra = ?, guru_matha = ?,
       dob = ?, time_of_birth = ?, current_age = ?, sub_caste = ?, place_of_birth = ?, place_of_birth_state = ?, place_of_birth_country = ?,
       rashi = ?, height = ?, nakshatra = ?, charana_pada = ?, email = ?, phone = ?, alternate_phone = ?,
       guardian_phone = ?, -- Placeholder for guardian_phone
@@ -67,7 +75,9 @@ const updateProfile = async (profileId, profileData) => {
 
   const values = [
     sanitize(name), sanitize(profile_created_for), sanitize(profile_for), sanitize(mother_tongue),
-    sanitize(native_place), sanitize(native_place_state), sanitize(native_place_country), sanitize(current_location_state), sanitize(current_location_country), sanitize(current_location), sanitize(profile_status), sanitize(married_status),
+    sanitize(native_place), sanitize(native_place_state), sanitize(native_place_country), 
+    sanitize(current_location_state), sanitize(current_location_country), 
+    sanitize(current_location), sanitizeStatus(profile_status), sanitize(married_status),
     sanitize(gotra), sanitize(guru_matha), sanitize(dob), sanitize(time_of_birth), sanitize(current_age),
     sanitize(sub_caste), sanitize(place_of_birth), sanitize(place_of_birth_state), sanitize(place_of_birth_country), sanitize(rashi), sanitize(height), sanitize(nakshatra),
     sanitize(charana_pada), sanitize(email), sanitize(phone), sanitize(alternate_phone),

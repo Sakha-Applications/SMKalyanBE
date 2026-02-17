@@ -46,6 +46,8 @@ require("dotenv").config();
 // Import the new direct update routes
 const directUpdateRoutes = require('./routes/directUpdateRoutes');
 
+const adminRoutes = require("./routes/adminRoutes");
+
 const app = express();
 
 // Middleware
@@ -104,6 +106,8 @@ app.use('/api', invitationRoutes); // <--- ADD THIS LINE
 
 // Add this line with your other route middleware (after your existing routes)
 app.use('/api/direct', directUpdateRoutes);
+
+app.use("/api", adminRoutes);
 
 console.log('Contact Details routes mounted under /api'); // Add this log
 
