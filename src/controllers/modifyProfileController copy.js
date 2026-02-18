@@ -443,45 +443,6 @@ const getProfileByIdHandler = async (req, res) => {
         }
 
         console.log('🟢 Successfully fetched profile for ID:', profileId);
-
-        // ✅ MINIMAL ADDITION: Mask contact details ONLY for "other profiles"
-        // Add masking just before sending the response, without refactoring anything else.
-        try {
-            // Confirm req.user.userId exists (JWT middleware)
-            const viewerUserId = req.user && req.user.userId ? req.user.userId : null;
-
-            // Safe fallback:
-            // If we cannot identify viewerUserId, we mask by default (safer for production).
-            let shouldMask = true;
-
-            if (viewerUserId) {
-                const viewerUser = await UserLogin.findByUserId(viewerUserId);
-                const viewerProfileId = viewerUser && viewerUser.profile_id ? viewerUser.profile_id : null;
-
-                // If viewer profile == requested profileId, do NOT mask
-                if (viewerProfileId && viewerProfileId.toString() === profileId.toString()) {
-                    shouldMask = false;
-                }
-            } else {
-                console.log('⚠️ req.user.userId is missing in getProfileByIdHandler; applying safe fallback masking.');
-            }
-
-            if (shouldMask) {
-                // As requested: if viewer profile != requested profileId → set phone, email, communication_address to null
-                if (profile && Object.prototype.hasOwnProperty.call(profile, 'phone')) profile.phone = null;
-                if (profile && Object.prototype.hasOwnProperty.call(profile, 'email')) profile.email = null;
-                if (profile && Object.prototype.hasOwnProperty.call(profile, 'communication_address')) profile.communication_address = null;
-
-                console.log('🟡 Masked sensitive contact fields for profile ID:', profileId);
-            } else {
-                console.log('🟢 Viewer is requesting own profile via byId; contact fields not masked for profile ID:', profileId);
-            }
-        } catch (maskErr) {
-            console.error('⚠️ Error while masking sensitive fields in getProfileByIdHandler:', maskErr);
-            // Fail-safe: do not crash API; keep response.
-            // (We are not forcing masking here to avoid changing behavior beyond minimal requirement.)
-        }
-
         // We're returning the raw profile data from the DB for simplicity.
         // If frontend expects camelCase, you'd apply mapping here similar to getOwnProfile.
         // For ViewModeProfile, it likely expects snake_case for many fields directly from DB.
@@ -496,3 +457,4 @@ const getProfileByIdHandler = async (req, res) => {
 // You'll need to export this new function.
 // Update your module.exports line to include getProfileByIdHandler
 module.exports = { updateOwnProfile, getOwnProfile, getProfileByIdHandler }; // <-- UPDATE THIS LINE
+

@@ -1,7 +1,5 @@
 const contactDetailsModel = require("../models/contactDetailsModel");
 const UserLogin = require('../models/userLoginModel'); // Import the UserLogin model
-const adminSettingsModel = require("../models/adminSettingsModel"); // ✅ NEW (DB settings)
-
 console.log("✅ contactDetailsController.js loaded");
 
 const getContactDetails = async (req, res) => {
@@ -44,24 +42,6 @@ const shareContactDetails = async (req, res) => {
         const { sharedProfileId, sharedProfileName } = req.body;
         console.debug("🤝 shareContactDetails - Sharing details for profile ID:", sharedProfileId, "name:", sharedProfileName);
 
-        if (!sharedProfileId) {
-            return res.status(400).json({ message: "sharedProfileId is required." });
-        }
-
-        // ✅ Read X from Admin Settings (DB)
-        let CONTACT_VIEW_LIMIT = 10; // safe default
-        try {
-            const settings = await adminSettingsModel.getSettings();
-            const rawX = settings?.[adminSettingsModel.KEYS.CONTACT_VIEWS_PER_CYCLE];
-            const parsedX = parseInt(rawX, 10);
-            if (Number.isFinite(parsedX) && parsedX > 0) {
-                CONTACT_VIEW_LIMIT = parsedX;
-            }
-        } catch (e) {
-            console.error("⚠️ Failed to fetch admin settings for CONTACT_VIEWS_PER_CYCLE. Using default 10.", e.message);
-        }
-        console.debug("🔧 shareContactDetails - CONTACT_VIEW_LIMIT (X):", CONTACT_VIEW_LIMIT);
-
         // 1. Find the user by email to get the associated profile ID
         const user = await UserLogin.findByUserId(userEmail);
         if (!user) {
@@ -80,17 +60,12 @@ const shareContactDetails = async (req, res) => {
         const uniqueSharedContactsCount = await contactDetailsModel.countUniqueSharedContacts(loggedInUserProfileId);
         console.debug("🔢 shareContactDetails - Unique shared contacts count for user:", uniqueSharedContactsCount);
 
-        // ✅ Enforce X views per cycle
-        if (uniqueSharedContactsCount >= CONTACT_VIEW_LIMIT) {
-            console.warn(`🛑 shareContactDetails - User reached limit of ${CONTACT_VIEW_LIMIT} contact views.`);
-            return res.status(403).json({
-                message: `You have reached the limit of ${CONTACT_VIEW_LIMIT} contact views. Please recharge to view more profiles.`,
-                limit: CONTACT_VIEW_LIMIT,
-                used: uniqueSharedContactsCount
-            });
+        if (uniqueSharedContactsCount >= 5) {
+            console.warn("🛑 shareContactDetails - User has reached the limit of 5 free contacts.");
+            return res.status(403).json({ message: 'You have reached the limit of 5 free contact details. Please add more credits to get new contacts.' });
         }
 
-        // 3. Check if the contact has already been shared with this user
+        // 3. Check if the contact has already been shared with this user (optional, but good to prevent duplicates)
         const existingShare = await contactDetailsModel.findExistingShare(loggedInUserProfileId, sharedProfileId);
         if (existingShare) {
             console.info("🔄 shareContactDetails - Contact already shared with this user.");
@@ -134,13 +109,25 @@ const shareContactDetails = async (req, res) => {
     }
 };
 
-// ✅ Policy: Email/Download/Print disabled
 const sendEmailReport = async (req, res) => {
-    console.warn("🛑 sendEmailReport called but feature is disabled by policy.");
-    return res.status(403).json({
-        success: false,
-        message: "Email/Download/Print features are disabled. Please view contact details on-screen only."
-    });
+    console.log("📧 sendEmailReport function is being called with body:", req.body);
+    console.debug("📧 sendEmailReport - Request body:", req.body);
+
+    try {
+        const { email, subject, data } = req.body;
+        console.debug("📧 sendEmailReport - Email details:", { email, subject });
+
+        // Placeholder for email sending logic
+        console.log(`📧 Email would be sent to: ${email}`);
+
+        setTimeout(() => {
+            res.json({ success: true, message: "Email sent successfully" });
+        }, 1000);
+
+    } catch (error) {
+        console.error("❌ Error sending email report:", error);
+        res.status(500).json({ message: "Failed to send email report.", error: error.message });
+    }
 };
 
 module.exports = { getContactDetails, shareContactDetails, sendEmailReport };

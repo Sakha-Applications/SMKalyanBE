@@ -4,45 +4,34 @@ const pool = require("../config/db");
 // Insert new offline payment record
 const insertOfflinePayment = async (paymentDetails) => {
     try {
-        const {
-            profile_id,
-            amount,
-            payment_type,
+        const { 
+            profile_id, 
+            amount, 
+            payment_type, 
             payment_mode,
-            payment_method,
-            payment_reference,
+            payment_method, 
+            payment_reference, 
             payment_date,
             payment_time,
             phone_number,
             email,
             transactionDetails
         } = paymentDetails;
-
+        
         // Using the updated table structure
         const [result] = await pool.query(
             `INSERT INTO tblofflinepayments 
             (profile_id, amount, payment_type, payment_mode, payment_method, payment_reference, 
              payment_date, payment_time, phone_number, email,admin_notes) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                profile_id,
-                amount,
-                payment_type,
-                payment_mode,
-                payment_method || payment_mode,
-                payment_reference,
-                payment_date,
-                payment_time,
-                phone_number,
-                email,
-                transactionDetails
-            ]
+            [profile_id, amount, payment_type, payment_mode, payment_method || payment_mode, 
+             payment_reference, payment_date, payment_time, phone_number, email,transactionDetails]
         );
-
-        console.log("✅ Offline payment details inserted:", {
-            profile_id,
-            payment_method: payment_method || payment_mode,
-            insertId: result.insertId
+        
+        console.log("✅ Offline payment details inserted:", { 
+            profile_id, 
+            payment_method: payment_method || payment_mode, 
+            insertId: result.insertId 
         });
         return result.insertId;
     } catch (error) {
@@ -67,20 +56,6 @@ const getOfflinePaymentsByProfileId = async (profileId) => {
     }
 };
 
-// ✅ NEW: Get a single offline payment row by paymentId (needed for admin verification flow)
-const getOfflinePaymentById = async (paymentId) => {
-    try {
-        const [rows] = await pool.query(
-            `SELECT * FROM tblofflinepayments WHERE id = ? LIMIT 1`,
-            [paymentId]
-        );
-        return rows?.[0] || null;
-    } catch (error) {
-        console.error("❌ Error fetching offline payment by id:", error);
-        throw error;
-    }
-};
-
 // Update payment status (for admin use)
 const updatePaymentStatus = async (paymentId, status, adminNotes) => {
     try {
@@ -98,9 +73,7 @@ const updatePaymentStatus = async (paymentId, status, adminNotes) => {
     }
 };
 
-// New function to record successful renewal payment with optional contact reset
-// NOTE: We will stop calling this with resetContacts=true from controller.
-// Reset will be triggered after admin marks the payment as VERIFIED (Option A).
+// New function to record successful renewal payment with contact reset
 const recordRenewalPayment = async (paymentDetails, resetContacts = false) => {
     let connection;
     try {
@@ -108,44 +81,33 @@ const recordRenewalPayment = async (paymentDetails, resetContacts = false) => {
         connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        const {
-            profile_id,
-            amount,
-            payment_type,
+        const { 
+            profile_id, 
+            amount, 
+            payment_type, 
             payment_mode,
-            payment_method,
-            payment_reference,
+            payment_method, 
+            payment_reference, 
             payment_date,
             payment_time,
             phone_number,
             email,
             transactionDetails
         } = paymentDetails;
-
+        
         // Insert payment record
         const [paymentResult] = await connection.query(
             `INSERT INTO tblofflinepayments 
             (profile_id, amount, payment_type, payment_mode, payment_method, payment_reference, 
              payment_date, payment_time, phone_number, email, admin_notes) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-                profile_id,
-                amount,
-                payment_type,
-                payment_mode,
-                payment_method || payment_mode,
-                payment_reference,
-                payment_date,
-                payment_time,
-                phone_number,
-                email,
-                transactionDetails
-            ]
+            [profile_id, amount, payment_type, payment_mode, payment_method || payment_mode, 
+             payment_reference, payment_date, payment_time, phone_number, email, transactionDetails]
         );
 
         let deletedRecords = 0;
-
-        // If this is a renewal payment, reset the shared contacts (kept for compatibility, but controller will not use it)
+        
+        // If this is a renewal payment, reset the shared contacts
         if (resetContacts && payment_type === 'ProfileRenewal') {
             console.log("🔄 Processing renewal - resetting shared contacts for profile:", profile_id);
             const [deleteResult] = await connection.query(
@@ -158,14 +120,14 @@ const recordRenewalPayment = async (paymentDetails, resetContacts = false) => {
 
         // Commit the transaction
         await connection.commit();
-
-        console.log("✅ Renewal payment recorded (optional contact reset):", {
-            profile_id,
-            payment_method: payment_method || payment_mode,
+        
+        console.log("✅ Renewal payment recorded with contact reset:", { 
+            profile_id, 
+            payment_method: payment_method || payment_mode, 
             insertId: paymentResult.insertId,
             deletedContactRecords: deletedRecords
         });
-
+        
         return {
             paymentId: paymentResult.insertId,
             deletedContactRecords: deletedRecords
@@ -176,7 +138,7 @@ const recordRenewalPayment = async (paymentDetails, resetContacts = false) => {
         if (connection) {
             await connection.rollback();
         }
-        console.error("❌ Error recording renewal payment (optional contact reset):", error);
+        console.error("❌ Error recording renewal payment with contact reset:", error);
         throw error;
     } finally {
         if (connection) {
@@ -185,10 +147,9 @@ const recordRenewalPayment = async (paymentDetails, resetContacts = false) => {
     }
 };
 
-module.exports = {
-    insertOfflinePayment,
+module.exports = { 
+    insertOfflinePayment, 
     getOfflinePaymentsByProfileId,
-    getOfflinePaymentById,   // ✅ NEW export
     updatePaymentStatus,
     recordRenewalPayment
 };
