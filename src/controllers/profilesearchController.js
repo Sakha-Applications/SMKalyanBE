@@ -34,22 +34,28 @@ const searchProfiles = async (req, res) => {
     console.log("🧾 BASIC SEARCH myProfileId(from body):", myProfileId || "(EMPTY)");
     console.log("🧾 BASIC SEARCH myProfileFor(from body):", myProfileForFromBody || "(EMPTY)");
 
-    // 1) get myProfileFor from body if present
-    let myProfileFor = String(myProfileForFromBody || "").trim();
+    let eligibilityContext = null;
 
-    // 2) If missing, derive from DB using myProfileId (server-side enforced)
-    if (isBlank(myProfileFor) && !isBlank(myProfileId)) {
-      console.log("⚠️ BASIC SEARCH myProfileFor missing -> fetching from DB using myProfileId...");
-      try {
-        const dbProfileFor = await ProfileSearchModel.getProfileForByProfileId(myProfileId);
-        myProfileFor = String(dbProfileFor || "").trim();
-        console.log("🧾 BASIC SEARCH myProfileFor(from DB):", myProfileFor || "(EMPTY)");
-      } catch (e) {
-        console.log("❌ BASIC SEARCH DB lookup failed:", e?.message);
-      }
-    }
+if (!isBlank(myProfileId)) {
+  console.log(
+    "BASIC SEARCH loading candidate eligibility context for:",
+    myProfileId
+  );
 
-    console.log("🧾 BASIC SEARCH myProfileFor(final):", myProfileFor || "(EMPTY)");
+  eligibilityContext =
+    await ProfileSearchModel.getCandidateEligibilityContext(
+      myProfileId
+    );
+
+  console.log(
+    "BASIC SEARCH candidate eligibility context loaded:",
+    eligibilityContext
+  );
+}
+
+const myProfileFor =
+  eligibilityContext?.loggedInProfileFor ||
+  String(myProfileForFromBody || "").trim();
 
     const uiProfileFor = String(profileFor || "").trim();
     const applyOppositeByDefault = isBlank(uiProfileFor);
@@ -78,9 +84,10 @@ const searchProfiles = async (req, res) => {
       traditionalValues || "",
       currentLocationCountry || "",
       currentLocationState || "",
-      myProfileFor || "",
-      applyOppositeByDefault
-    );
+myProfileFor || "",
+applyOppositeByDefault,
+eligibilityContext
+);
 
     console.log(`✅ BASIC SEARCH results count: ${results.length}`);
     return res.status(200).json(results);

@@ -1,4 +1,7 @@
 const pool = require("../config/db");
+const {
+  applyCandidateEligibility,
+} = require("./candidateEligibility");
 
 // ✅ DB helper: get profile_for using profile_id
 const getProfileForByProfileId = async (profileId) => {
@@ -10,6 +13,61 @@ const getProfileForByProfileId = async (profileId) => {
 
   const [rows] = await pool.execute(sql, [pid]);
   return rows?.[0]?.profile_for || "";
+};
+
+const getCandidateEligibilityContext = async (profileId) => {
+  const pid = String(profileId || "").trim();
+
+  if (!pid) {
+    throw new Error(
+      "Candidate eligibility context requires profile ID."
+    );
+  }
+
+  const sql = `
+    SELECT
+      profile_id,
+      profile_for,
+      gotra
+    FROM profile
+    WHERE profile_id = ?
+    LIMIT 1
+  `;
+
+  const [rows] = await pool.execute(sql, [pid]);
+  const profile = rows?.[0];
+
+  if (!profile) {
+    throw new Error(
+      `Profile not found for candidate eligibility: ${pid}`
+    );
+  }
+
+  const profileFor = String(
+    profile.profile_for || ""
+  ).trim();
+
+  const gotra = String(
+    profile.gotra || ""
+  ).trim();
+
+  if (!profileFor) {
+    throw new Error(
+      `profile_for is missing for profile: ${pid}`
+    );
+  }
+
+  if (!gotra) {
+    throw new Error(
+      `Gotra is missing for profile: ${pid}`
+    );
+  }
+
+  return {
+    loggedInProfileId: String(profile.profile_id).trim(),
+    loggedInProfileFor: profileFor,
+    loggedInGotra: gotra,
+  };
 };
 
 const searchProfiles = async (
@@ -28,7 +86,8 @@ const searchProfiles = async (
   currentLocationCountry,
   currentLocationState,
   myProfileFor,
-  applyOppositeByDefault
+  applyOppositeByDefault,
+  eligibilityContext
 ) => {
   try {
     const clean = (v) => (v === undefined || v === null ? "" : String(v).trim());
@@ -68,27 +127,25 @@ const searchProfiles = async (
       currentLocationState: _currentLocationState,
       myProfileFor: _myProfileFor,
       applyOppositeByDefault: _applyOppositeByDefault,
+      eligibilityContext,
     });
 
     let query = "SELECT * FROM profile WHERE 1=1";
-    const values = [];
-    let filterCount = 0;
+const values = [];
+let filterCount = 0;
 
-    // ✅ REQUIRED DEFAULT:
-    // When UI does NOT send profileFor -> apply profile_for != myProfileFor
-    if (_applyOppositeByDefault) {
-      if (_myProfileFor) {
-        query += " AND profile_for != ?";
-        values.push(_myProfileFor);
-        filterCount++;
-        console.log("✅ MODEL applied default filter: profile_for != myProfileFor");
-      } else {
-        console.log(
-          "⚠️ MODEL applyOppositeByDefault is TRUE but myProfileFor is EMPTY -> cannot apply default filter"
-        );
-      }
-    }
+const eligibilityResult = applyCandidateEligibility(
+  query,
+  values,
+  eligibilityContext
+);
 
+query = eligibilityResult.query;
+
+console.log(
+  "✅ BASIC SEARCH global candidate eligibility applied"
+);
+    
     // Normal filters (apply if provided)
     if (_profileId) {
       query += " AND profile_id = ?";
@@ -193,4 +250,8 @@ const searchProfiles = async (
   }
 };
 
-module.exports = { searchProfiles, getProfileForByProfileId };
+module.exports = {
+  searchProfiles,
+  getProfileForByProfileId,
+  getCandidateEligibilityContext,
+};
