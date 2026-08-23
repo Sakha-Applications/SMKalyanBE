@@ -2,7 +2,7 @@
 
 require('dotenv').config(); // Load environment variables from .env
 const pool = require("../config/db"); // Your existing database connection pool
-const bcrypt = require('bcrypt'); // For password hashing
+const bcrypt = require('bcryptjs'); // For password hashing (pure-JS)
 
 // --- Configuration ---
 const BCRYPT_SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '10', 10);
