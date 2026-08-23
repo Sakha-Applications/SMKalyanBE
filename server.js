@@ -1,4 +1,14 @@
 console.log(__filename);
+
+/*
+ * Load environment configuration before
+ * importing the application.
+ *
+ * Controllers/services imported by app.js
+ * may read process.env during module loading.
+ */
+require("dotenv").config();
+
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
@@ -50,6 +60,11 @@ app.use((req, res, next) => {
 
 // Start the server
 app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-    console.log(`Access photos at: http://localhost:${PORT}/profilePhotos/[filename]`);
-});
+    console.log(
+        `Server running at http://localhost:${PORT}`
+    );
+
+    console.log(
+        `Access photos at: http://localhost:${PORT}/profilePhotos/[filename]`
+    );
+}); 

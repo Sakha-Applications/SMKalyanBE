@@ -56,7 +56,8 @@ const guruMathaRoutes =
 const invitationRoutes = require('./routes/InvitationRoutes'); // <--- ADD THIS LINE
 
 
-require("dotenv").config();
+// Environment variables are loaded in server.js
+// before this application module is imported.
 
 // Import the new direct update routes
 const directUpdateRoutes = require('./routes/directUpdateRoutes');

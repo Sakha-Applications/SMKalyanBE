@@ -1,15 +1,51 @@
 // src/services/emailService.js
 
 const nodemailer = require("nodemailer");
+const crypto = require("crypto");
 
 console.log("✅ emailService.js loaded");
 
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD;
+const EMAIL_USER =
+  process.env.EMAIL_USER;
+
+const EMAIL_PASSWORD =
+  process.env.EMAIL_PASSWORD;
 
 const EMAIL_FROM =
   process.env.EMAIL_FROM ||
   "SM Kalyana Sakha";
+
+const EMAIL_PASSWORD_FINGERPRINT =
+  EMAIL_PASSWORD
+    ? crypto
+        .createHash("sha256")
+        .update(EMAIL_PASSWORD)
+        .digest("hex")
+        .substring(0, 8)
+    : "missing";
+
+console.log(
+  "[EmailService] Configuration:",
+  {
+    user:
+      EMAIL_USER ||
+      "(not configured)",
+
+    passwordConfigured:
+      Boolean(EMAIL_PASSWORD),
+
+    passwordLength:
+      EMAIL_PASSWORD
+        ? EMAIL_PASSWORD.length
+        : 0,
+
+    passwordFingerprint:
+      EMAIL_PASSWORD_FINGERPRINT,
+
+    from:
+      EMAIL_FROM
+  }
+);
 
 let transporter = null;
 
