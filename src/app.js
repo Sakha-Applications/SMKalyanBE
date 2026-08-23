@@ -36,11 +36,25 @@ const accountAvailabilityRoutes = require('./routes/accountAvailabilityRoutes');
 
 const preferredProfileRoutes = require('./routes/preferredProfileRoutes');
 
-const guruMathaRoutes = require("./routes/guruMathaRoutes");
+const advertisementResponseRoutes =
+  require(
+    "./routes/advertisementResponseRoutes"
+  );
+
+const profileForwardRoutes =
+  require(
+    "./routes/profileForwardRoutes"
+  );
+
+const guruMathaRoutes =
+  require(
+    "./routes/guruMathaRoutes"
+  );
 // const paymentRoutes = require('./routes/paymentRoutes'); // Import payment routes
 
 // NEW: Import InvitationRoutes
 const invitationRoutes = require('./routes/InvitationRoutes'); // <--- ADD THIS LINE
+
 
 require("dotenv").config();
 
@@ -63,6 +77,15 @@ app.use('/ProfilePhotos', express.static(photosDirectory));
 console.log('Static files served from:', photosDirectory, 'at route /ProfilePhotos');
 
 // Routes
+
+/*
+ * Mount security-sensitive, explicit contact routes
+ * before broader/generic profile routers.
+ *
+ * Express resolves routes in registration order.
+ */
+app.use("/api", contactDetailsRoutes);
+
 app.use("/api", userRoutes);
 app.use("/api", userLoginRoutes);
 app.use('/api', authRoutes);
@@ -73,9 +96,8 @@ app.use("/api", rashiRoutes);
 app.use("/api", nakshatraRoutes);
 app.use("/api", profilesearchRoutes);
 app.use("/api", uploadSearchRoutes);
-app.use("/api", advancedSearchRoutes); // Use the new routes
+app.use("/api", advancedSearchRoutes);
 app.use("/api", uploadPhotosRoutes);
-app.use("/api", contactDetailsRoutes); // Add this line
 app.use('/test', testRoutes);
 app.use('/api', modifyProfileRoutes);
 app.use("/api", nativePlaceRoutes); // Add this line
@@ -98,6 +120,16 @@ app.use("/api", designationRoutes);
 
 // Add this line with your other route declarations
 app.use('/api/preferred-profiles', preferredProfileRoutes);
+
+app.use(
+  "/api/advertisement-responses",
+  advertisementResponseRoutes
+);
+
+app.use(
+  "/api",
+  profileForwardRoutes
+);
 
 app.use('/api', educationRoutes);
 

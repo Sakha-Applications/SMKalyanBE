@@ -1,54 +1,89 @@
 // src/services/emailService.js
-const nodemailer = require('nodemailer');
-console.log("✅ emailService.js loaded (HARD-CODED MODE)");
 
-// ❗️Hardcoded credentials (for testing only — DO NOT use in production)
-const EMAIL_USER = "smkalyanasakha@gmail.com";               // Replace with your actual Gmail address
-const EMAIL_PASSWORD = "ksvi cuyy szef fbgi";     
-const EMAIL_FROM="SM Kalyana Sakha";       // Replace with your Gmail App Password
+const nodemailer = require("nodemailer");
 
-// Log environment variable status (DO NOT log actual values in production)
-console.log("📦 EMAIL_USER:", process.env.EMAIL_USER ? "✅ Set" : "❌ Missing");
-console.log("📦 EMAIL_PASSWORD:", process.env.EMAIL_PASSWORD ? "✅ Set" : "❌ Missing");
+console.log("✅ emailService.js loaded");
 
-let transporter;
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD;
 
-try {
-    transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        auth: {
-            user: EMAIL_USER,
-            pass: EMAIL_PASSWORD
-        }
-    });
+const EMAIL_FROM =
+  process.env.EMAIL_FROM ||
+  "SM Kalyana Sakha";
 
-    // Verify the connection configuration
-    transporter.verify((error, success) => {
-        if (error) {
-            console.error("❌ Transporter verification failed:", error);
-        } else {
-            console.log("✅ Transporter verified successfully. Ready to send emails.");
-        }
-    });
+let transporter = null;
 
-} catch (err) {
-    console.error("❌ Error creating transporter:", err);
-}
+const getTransporter = () => {
+  if (transporter) {
+    return transporter;
+  }
 
-const sendEmailReport = async (mailOptions) => {
-    console.log("📤 Preparing to send email with the following options:");
-    console.log("  ➤ From:", mailOptions.from);
-    console.log("  ➤ To:", mailOptions.to);
-    console.log("  ➤ Subject:", mailOptions.subject);
+  if (!EMAIL_USER || !EMAIL_PASSWORD) {
+    throw new Error(
+      "Email configuration missing. EMAIL_USER and EMAIL_PASSWORD are required."
+    );
+  }
 
-    try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log('✅ Email sent successfully:', info.messageId);
-        return { success: true, messageId: info.messageId };
-    } catch (error) {
-        console.error('❌ Failed to send email:', error);
-        throw error;
+  transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASSWORD
     }
+  });
+
+  return transporter;
 };
 
-module.exports = { sendEmailReport };
+
+const sendEmailReport = async ({
+  to,
+  subject,
+  text,
+  html
+}) => {
+  if (!to) {
+    throw new Error(
+      "Email recipient is required."
+    );
+  }
+
+  const mailTransporter =
+    getTransporter();
+
+  const mailOptions = {
+    from: `"${EMAIL_FROM}" <${EMAIL_USER}>`,
+    to,
+    subject,
+    text,
+    html
+  };
+
+  try {
+    const info =
+      await mailTransporter.sendMail(
+        mailOptions
+      );
+
+    console.log(
+      "✅ Email sent:",
+      info.messageId
+    );
+
+    return {
+      success: true,
+      messageId: info.messageId
+    };
+  } catch (error) {
+    console.error(
+      "❌ Failed to send email:",
+      error
+    );
+
+    throw error;
+  }
+};
+
+module.exports = {
+  sendEmailReport
+};

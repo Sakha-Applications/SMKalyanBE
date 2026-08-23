@@ -4,13 +4,14 @@ const router = express.Router();
 
 const requireAuth = require("../middleware/requireAuth");
 const isAdmin = require("../middleware/isAdmin");
+const isModeratorOrAdmin = require("../middleware/isModeratorOrAdmin");
 const adminController = require("../controllers/adminController");
 
 // Approve a profile (admin-only)
 router.put(
   "/admin/profile/:profileId/approve",
   requireAuth,
-  isAdmin,
+  isModeratorOrAdmin,
   adminController.approveProfile
 );
 
@@ -18,7 +19,7 @@ router.put(
 router.get(
   "/admin/profiles/payment-submitted",
   requireAuth,
-  isAdmin,
+  isModeratorOrAdmin,
   adminController.listPaymentSubmittedProfiles
 );
 
@@ -26,7 +27,7 @@ router.get(
 router.get(
   "/admin/offline-payments/pending",
   requireAuth,
-  isAdmin,
+  isModeratorOrAdmin,
   adminController.listPendingOfflinePayments
 );
 

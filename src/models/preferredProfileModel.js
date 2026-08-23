@@ -27,24 +27,107 @@ class PreferredProfileModel {
       validityDate.setDate(validityDate.getDate() + 90);
       const validity_date = validityDate.toISOString().split('T')[0];
 
-      // Check if profile already has an active preferred status
-      const existingActive = await this.getActivePreferredProfile(profile_id);
-      if (existingActive) {
-        throw new Error('Profile already has an active preferred status');
+      /*
+       * Idempotency:
+       * if the same advertisement/payment reference
+       * is submitted again, reuse the existing row.
+       */
+      const [sameSubmissionRows] =
+        await db.execute(
+          `
+            SELECT id
+            FROM preferred_profiles
+            WHERE profile_id = ?
+              AND payment_reference = ?
+            ORDER BY id DESC
+            LIMIT 1
+          `,
+          [
+            profile_id,
+            payment_reference
+          ]
+        );
+
+      if (
+        sameSubmissionRows.length > 0
+      ) {
+        return this.getPreferredProfileById(
+          sameSubmissionRows[0].id
+        );
+      }
+
+      /*
+       * A different advertisement cannot be
+       * started while one is already pending
+       * or currently published.
+       */
+      const [existingRows] =
+        await db.execute(
+          `
+            SELECT id, status
+            FROM preferred_profiles
+            WHERE profile_id = ?
+              AND status IN (
+                'pending_payment',
+                'pending_review',
+                'active'
+              )
+            ORDER BY created_at DESC
+            LIMIT 1
+          `,
+          [profile_id]
+        );
+
+      if (
+        existingRows.length > 0
+      ) {
+        throw new Error(
+          'Profile already has an advertisement in progress or active'
+        );
       }
 
       const query = `
         INSERT INTO preferred_profiles (
-          profile_id, email, phone_number, member_name, payment_amount,
-          payment_method, payment_reference, payment_date, payment_time,
-          validity_date, transaction_details, preferred_flag, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'active')
+          profile_id,
+          email,
+          phone_number,
+          member_name,
+          payment_amount,
+          payment_method,
+          payment_reference,
+          payment_date,
+          payment_time,
+          validity_date,
+          transaction_details,
+          payment_status,
+          review_status,
+          moderator_narrative,
+          preferred_flag,
+          status
+        )
+        VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          'PENDING',
+          'PENDING',
+          ?,
+          0,
+          'pending_payment'
+        )
       `;
 
       const values = [
-        profile_id, email, phone_number, member_name, payment_amount,
-        payment_method, payment_reference, payment_date, payment_time,
-        validity_date, transaction_details
+        profile_id,
+        email,
+        phone_number,
+        member_name,
+        payment_amount,
+        payment_method,
+        payment_reference,
+        payment_date,
+        payment_time,
+        validity_date,
+        transaction_details,
+        transaction_details
       ];
 
       const [result] = await db.execute(query, values);
@@ -72,8 +155,19 @@ class PreferredProfileModel {
         SELECT
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
-          validity_date, transaction_details, preferred_flag, status,
-          created_at, updated_at,
+          validity_date,
+          transaction_details,
+          payment_status,
+          review_status,
+          moderator_narrative,
+          moderator_remarks,
+          reviewed_by,
+          reviewed_at,
+          published_at,
+          preferred_flag,
+          status,
+          created_at,
+          updated_at,
           DATEDIFF(validity_date, CURDATE()) as days_remaining,
           CASE
             WHEN validity_date >= CURDATE() THEN 'valid'
@@ -168,8 +262,19 @@ class PreferredProfileModel {
         SELECT
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
-          validity_date, transaction_details, preferred_flag, status,
-          created_at, updated_at,
+          validity_date,
+          transaction_details,
+          payment_status,
+          review_status,
+          moderator_narrative,
+          moderator_remarks,
+          reviewed_by,
+          reviewed_at,
+          published_at,
+          preferred_flag,
+          status,
+          created_at,
+          updated_at,
           DATEDIFF(validity_date, CURDATE()) as days_remaining,
           CASE
             WHEN validity_date >= CURDATE() THEN 'valid'
@@ -325,15 +430,75 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
     if (format === 'ticker') {
       query = `
         SELECT
+          pp.id,
           pp.profile_id,
           pp.member_name,
-          pp.transaction_details,
-          DATEDIFF(pp.validity_date, CURDATE()) as days_remaining,
-          pp.updated_at
+          pp.looking_for,
+
+          COALESCE(
+            NULLIF(pp.moderator_narrative, ''),
+            pp.transaction_details
+          ) AS transaction_details,
+
+          DATEDIFF(
+            pp.validity_date,
+            CURDATE()
+          ) AS days_remaining,
+
+          pp.updated_at,
+
+          COALESCE(
+            p.name,
+            pp.member_name,
+            'N/A'
+          ) AS name,
+
+          COALESCE(
+            p.current_age,
+            0
+          ) AS current_age,
+
+          COALESCE(
+            p.gotra,
+            'Not specified'
+          ) AS gotra,
+
+          COALESCE(
+            p.profession,
+            p.designation,
+            'Not specified'
+          ) AS profession,
+
+          COALESCE(
+            p.current_location,
+            'Not specified'
+          ) AS city,
+
+          COALESCE(
+            p.annual_income,
+            'Not specified'
+          ) AS annual_income,
+
+          COALESCE(
+            p.education,
+            'Not specified'
+          ) AS education,
+
+          COALESCE(
+            p.profile_category_need,
+            ''
+          ) AS profile_category_need
+
         FROM preferred_profiles pp
+
+        LEFT JOIN profile p
+          ON p.profile_id =
+             pp.profile_id
+
         WHERE pp.status = 'active'
           AND pp.preferred_flag = 1
           AND pp.validity_date >= CURDATE()
+
         ORDER BY pp.updated_at DESC
       `;
     } else {
@@ -343,7 +508,11 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
           pp.id,
           pp.profile_id,
           pp.member_name,
-          pp.transaction_details,
+          pp.looking_for,
+          COALESCE(
+            NULLIF(pp.moderator_narrative, ''),
+            pp.transaction_details
+          ) AS transaction_details,
           pp.payment_amount,
           pp.validity_date,
           DATEDIFF(pp.validity_date, CURDATE()) as days_remaining,
@@ -383,12 +552,13 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
 
     return rows.map(row => ({
       ...row,
-      // Ensure display_summary is always available
-      display_summary: row.transaction_details && row.transaction_details.trim()
-        ? (row.transaction_details.length > 100
-          ? row.transaction_details.substring(0, 97) + '...'
-          : row.transaction_details)
-        : `${row.name || row.member_name || 'Profile'} is a preferred member looking for a life partner.`,
+      // Keep the complete approved advertisement narrative.
+      // Do not truncate the advertisement in the API.
+      display_summary:
+        row.transaction_details &&
+        row.transaction_details.trim()
+          ? row.transaction_details
+          : `${row.name || row.member_name || 'Profile'} is a preferred member looking for a life partner.`,
 
       // Ensure proper date formatting
       display_date: row.updated_at ? new Date(row.updated_at).toLocaleDateString() : null,
@@ -455,6 +625,257 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
       // Fallback to non-cached version, ensuring limit is an integer
       return this.getPreferredProfilesForDisplay(parseInt(limit, 10), format);
     }
+  }
+
+    static async getAdvertisementReviewQueue() {
+    const query = `
+      SELECT
+        pp.id,
+        pp.profile_id,
+        pp.member_name,
+        pp.looking_for,
+        pp.email,
+        pp.phone_number,
+        pp.payment_amount,
+        pp.payment_method,
+        pp.payment_reference,
+        pp.payment_date,
+        pp.payment_time,
+        pp.transaction_details,
+        pp.moderator_narrative,
+        pp.payment_status,
+        pp.review_status,
+        pp.status,
+        pp.moderator_remarks,
+        pp.reviewed_by,
+        pp.reviewed_at,
+        pp.created_at,
+        pp.updated_at,
+
+        p.name,
+        p.current_age,
+        p.gotra,
+        p.rashi,
+        p.nakshatra,
+        p.education,
+        p.profession,
+        p.designation,
+        p.current_location,
+        p.annual_income
+
+      FROM preferred_profiles pp
+
+      LEFT JOIN profile p
+        ON p.profile_id = pp.profile_id
+
+      WHERE pp.status = 'pending_review'
+        AND UPPER(
+          IFNULL(
+            pp.payment_status,
+            ''
+          )
+        ) = 'APPROVED'
+
+      ORDER BY pp.created_at ASC, pp.id ASC
+    `;
+
+    const [rows] =
+      await db.execute(query);
+
+    return rows;
+  }
+
+  static async findByProfileAndPaymentReference(
+    profileId,
+    paymentReference
+  ) {
+    const [rows] =
+      await db.execute(
+        `
+          SELECT *
+          FROM preferred_profiles
+          WHERE profile_id = ?
+            AND payment_reference = ?
+          ORDER BY id DESC
+          LIMIT 1
+        `,
+        [
+          profileId,
+          paymentReference
+        ]
+      );
+
+    return rows.length > 0
+      ? rows[0]
+      : null;
+  }
+
+
+
+  static async updateAdvertisementPaymentStatus({
+    profileId,
+    paymentReference,
+    paymentStatus
+  }) {
+    const normalized =
+      String(paymentStatus || "")
+        .trim()
+        .toUpperCase();
+
+    let status;
+    let reviewStatus;
+
+    if (normalized === "APPROVED") {
+      status = "pending_review";
+      reviewStatus = "PENDING";
+    } else if (
+      normalized === "REJECTED"
+    ) {
+      status = "payment_rejected";
+      reviewStatus = "REJECTED";
+    } else {
+      throw new Error(
+        "Invalid advertisement payment status"
+      );
+    }
+
+    const [result] =
+      await db.execute(
+        `
+          UPDATE preferred_profiles
+          SET
+            payment_status = ?,
+            review_status = ?,
+            status = ?,
+            preferred_flag = 0,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE profile_id = ?
+            AND payment_reference = ?
+            AND status = 'pending_payment'
+        `,
+        [
+          normalized,
+          reviewStatus,
+          status,
+          profileId,
+          paymentReference
+        ]
+      );
+
+    return result.affectedRows > 0;
+  }
+
+
+  static async reviewAdvertisement({
+    advertisementId,
+    action,
+    moderatorNarrative,
+    moderatorRemarks,
+    reviewedBy
+  }) {
+    const normalizedAction =
+      String(action || "")
+        .trim()
+        .toUpperCase();
+
+    if (
+      !["APPROVE", "REJECT"].includes(
+        normalizedAction
+      )
+    ) {
+      throw new Error(
+        "Invalid advertisement review action"
+      );
+    }
+
+    const advertisement =
+      await this.getPreferredProfileById(
+        advertisementId
+      );
+
+    if (!advertisement) {
+      return null;
+    }
+
+    if (
+      String(
+        advertisement.payment_status || ""
+      ).toUpperCase() !== "APPROVED"
+    ) {
+      throw new Error(
+        "Advertisement payment must be approved before advertisement review"
+      );
+    }
+
+    if (
+      normalizedAction === "REJECT"
+    ) {
+      await db.execute(
+        `
+          UPDATE preferred_profiles
+          SET
+            moderator_narrative = ?,
+            moderator_remarks = ?,
+            review_status = 'REJECTED',
+            status = 'rejected',
+            preferred_flag = 0,
+            reviewed_by = ?,
+            reviewed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `,
+        [
+          moderatorNarrative ||
+            advertisement.moderator_narrative ||
+            advertisement.transaction_details ||
+            "",
+          moderatorRemarks || null,
+          reviewedBy || null,
+          advertisementId
+        ]
+      );
+
+      return this.getPreferredProfileById(
+        advertisementId
+      );
+    }
+
+    /*
+     * Publication validity starts when Moderator
+     * approves the advertisement, not when the
+     * member submitted payment details.
+     */
+    await db.execute(
+      `
+        UPDATE preferred_profiles
+        SET
+          moderator_narrative = ?,
+          moderator_remarks = ?,
+          review_status = 'APPROVED',
+          status = 'active',
+          preferred_flag = 1,
+          validity_date =
+            DATE_ADD(CURDATE(), INTERVAL 90 DAY),
+          reviewed_by = ?,
+          reviewed_at = CURRENT_TIMESTAMP,
+          published_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `,
+      [
+        moderatorNarrative ||
+          advertisement.moderator_narrative ||
+          advertisement.transaction_details ||
+          "",
+        moderatorRemarks || null,
+        reviewedBy || null,
+        advertisementId
+      ]
+    );
+
+    return this.getPreferredProfileById(
+      advertisementId
+    );
   }
 }
 

@@ -10,6 +10,9 @@ const {
 const { getProfileStatus, updateProfileStatus } = require('../models/profileModel');
 const { resetSharedContactsForProfile } = require('../models/contactDetailsModel'); // ✅ reset contact views after verified renewal
 
+const PreferredProfileModel =
+    require('../models/preferredProfileModel');
+
 // Handle submission of offline payment details
 const submitOfflinePayment = async (req, res) => {
     try {
@@ -171,37 +174,149 @@ const updateOfflinePaymentStatus = async (req, res) => {
             });
         }
 
-        // Update payment status
-        const updated = await updatePaymentStatus(paymentId, status, adminNotes || '');
+        /*
+         * Read the payment first so related business
+         * records can be validated before finalizing
+         * the payment decision.
+         */
+        const paymentBeforeUpdate =
+            await getOfflinePaymentById(
+                paymentId
+            );
+
+        if (!paymentBeforeUpdate) {
+            return res.status(404).json({
+                success: false,
+                message:
+                    'Payment record not found'
+            });
+        }
+
+        /*
+         * Advertisement payment must have a matching
+         * advertisement submission before payment can
+         * be verified/rejected.
+         */
+        if (
+            paymentBeforeUpdate.payment_type ===
+                'PreferredProfile' &&
+            ['verified', 'rejected'].includes(
+                status
+            )
+        ) {
+            const advertisement =
+                await PreferredProfileModel
+                    .findByProfileAndPaymentReference(
+                        paymentBeforeUpdate.profile_id,
+                        paymentBeforeUpdate.payment_reference
+                    );
+
+            /*
+             * The helper is added in the next change.
+             */
+            if (!advertisement) {
+                return res.status(409).json({
+                    success: false,
+                    message:
+                        'Cannot process advertisement payment because the matching advertisement submission was not found.'
+                });
+            }
+        }
+
+        // Update payment status only after validation.
+        const updated =
+            await updatePaymentStatus(
+                paymentId,
+                status,
+                adminNotes || ''
+            );
 
         if (!updated) {
             return res.status(404).json({
                 success: false,
-                message: 'Payment record not found'
+                message:
+                    'Payment record not found'
             });
         }
 
-        // ✅ Option A: On VERIFIED, apply renewal effect (reset views) ONLY for ProfileRenewal
-        if (status === 'verified') {
-            try {
-                const paymentRow = await getOfflinePaymentById(paymentId);
+        /*
+         * Apply payment-specific business effects
+         * only after Moderator/Admin verification.
+         */
+        try {
+            const paymentRow =
+                await getOfflinePaymentById(
+                    paymentId
+                );
 
-                if (paymentRow && paymentRow.payment_type === 'ProfileRenewal') {
-                    // Recharge allowed only for APPROVED profiles already (submit gate),
-                    // but we keep reset only here after admin verification.
-                    const profile_id = paymentRow.profile_id;
-                    await resetSharedContactsForProfile(profile_id);
-                    console.log(`✅ Shared contact views reset after verified renewal for profile_id=${profile_id}`);
-                }
-            } catch (e) {
-                console.error("⚠️ Verified update succeeded, but failed to apply renewal reset:", e.message);
-                // Do not fail the status update; return success with a warning
-                return res.json({
-                    success: true,
-                    message: `Payment status updated to ${status}, but renewal reset could not be applied. Please check logs.`,
-                    warning: e.message
-                });
+            if (
+                status === 'verified' &&
+                paymentRow?.payment_type ===
+                    'ProfileRenewal'
+            ) {
+                const profile_id =
+                    paymentRow.profile_id;
+
+                await resetSharedContactsForProfile(
+                    profile_id
+                );
+
+                console.log(
+                    `✅ Shared contact views reset after verified renewal for profile_id=${profile_id}`
+                );
             }
+
+            /*
+             * Advertisement payment decision.
+             *
+             * verified ->
+             * payment approved, advertisement moves
+             * to Moderator content review.
+             *
+             * rejected ->
+             * advertisement does not publish.
+             */
+            if (
+                paymentRow?.payment_type ===
+                    'PreferredProfile' &&
+                ['verified', 'rejected'].includes(
+                    status
+                )
+            ) {
+                const advertisementUpdated =
+                    await PreferredProfileModel
+                        .updateAdvertisementPaymentStatus({
+                            profileId:
+                                paymentRow.profile_id,
+
+                            paymentReference:
+                                paymentRow.payment_reference,
+
+                            paymentStatus:
+                                status === 'verified'
+                                    ? 'APPROVED'
+                                    : 'REJECTED'
+                        });
+
+                if (!advertisementUpdated) {
+                    throw new Error(
+                        `No matching advertisement found for profile ${paymentRow.profile_id} and payment reference ${paymentRow.payment_reference}`
+                    );
+                }
+            }
+
+        } catch (e) {
+            console.error(
+                "⚠️ Payment status updated, but related business action failed:",
+                e.message
+            );
+
+            return res.json({
+                success: true,
+                message:
+                    `Payment status updated to ${status}, but related processing could not be completed.`,
+                warning: e.message
+            });
         }
 
         return res.json({

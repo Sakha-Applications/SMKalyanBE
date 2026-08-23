@@ -4,6 +4,7 @@ const PreferredProfileController = require('../controllers/preferredProfileContr
 const requireAuth = require('../middleware/requireAuth');
 const requireApprovedProfile = require('../middleware/requireApprovedProfile');
 const isAdmin = require('../middleware/isAdmin');
+const isModeratorOrAdmin = require('../middleware/isModeratorOrAdmin');
 
 // Middleware for logging requests (optional)
 const logRequest = (req, res, next) => {
@@ -31,10 +32,38 @@ router.get('/display', PreferredProfileController.getPreferredProfilesForDisplay
 router.get('/check/:profileId', PreferredProfileController.checkIfProfilePreferred);
 
 /**
+ * Moderator/Admin advertisement operations
+ */
+router.get(
+  '/moderator/review-queue',
+  requireAuth,
+  isModeratorOrAdmin,
+  PreferredProfileController.getAdvertisementReviewQueue
+);
+
+router.put(
+  '/moderator/:advertisementId/review',
+  requireAuth,
+  isModeratorOrAdmin,
+  PreferredProfileController.reviewAdvertisement
+);
+
+/**
  * Admin-only endpoints
  */
-router.get('/stats', requireAuth, isAdmin, PreferredProfileController.getPreferredProfilesStats);
-router.put('/update-expired', requireAuth, isAdmin, PreferredProfileController.updateExpiredProfiles);
+router.get(
+  '/stats',
+  requireAuth,
+  isAdmin,
+  PreferredProfileController.getPreferredProfilesStats
+);
+
+router.put(
+  '/update-expired',
+  requireAuth,
+  isAdmin,
+  PreferredProfileController.updateExpiredProfiles
+);
 
 /**
  * User-only endpoints (LOCKED until APPROVED)

@@ -29,6 +29,8 @@ class PreferredProfileController {
           success: false,
           message: 'Missing required fields: profile_id, email, phone_number, member_name, payment_method, payment_reference'
         });
+
+    
       }
 
       // Create preferred profile record
@@ -433,6 +435,143 @@ class PreferredProfileController {
         success: false,
         message: 'Internal server error while updating expired profiles',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+    static async getAdvertisementReviewQueue(
+    req,
+    res
+  ) {
+    try {
+      const advertisements =
+        await PreferredProfileModel
+          .getAdvertisementReviewQueue();
+
+      return res.status(200).json({
+        success: true,
+        data: advertisements
+      });
+
+    } catch (error) {
+      console.error(
+        "[PreferredProfileController] Unable to load advertisement review queue:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Unable to load advertisement review queue"
+      });
+    }
+  }
+
+
+  static async reviewAdvertisement(
+    req,
+    res
+  ) {
+    try {
+      const {
+        advertisementId
+      } = req.params;
+
+      const {
+        action,
+        moderatorNarrative,
+        moderatorRemarks
+      } = req.body || {};
+
+      if (!advertisementId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Advertisement ID is required"
+        });
+      }
+
+      const normalizedAction =
+        String(action || "")
+          .trim()
+          .toUpperCase();
+
+      if (
+        !["APPROVE", "REJECT"].includes(
+          normalizedAction
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Action must be APPROVE or REJECT"
+        });
+      }
+
+      if (
+        normalizedAction === "APPROVE" &&
+        !String(
+          moderatorNarrative || ""
+        ).trim()
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Advertisement narrative is required before approval"
+        });
+      }
+
+      const reviewedBy =
+        req.user?.email ||
+        req.user?.userId ||
+        req.user?.profile_id ||
+        "SYSTEM";
+
+      const advertisement =
+        await PreferredProfileModel
+          .reviewAdvertisement({
+            advertisementId,
+            action:
+              normalizedAction,
+            moderatorNarrative:
+              String(
+                moderatorNarrative || ""
+              ).trim(),
+            moderatorRemarks:
+              String(
+                moderatorRemarks || ""
+              ).trim(),
+            reviewedBy
+          });
+
+      if (!advertisement) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Advertisement not found"
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message:
+          normalizedAction === "APPROVE"
+            ? "Advertisement approved and published."
+            : "Advertisement rejected.",
+        data: advertisement
+      });
+
+    } catch (error) {
+      console.error(
+        "[PreferredProfileController] Advertisement review failed:",
+        error
+      );
+
+      return res.status(400).json({
+        success: false,
+        message:
+          error.message ||
+          "Advertisement review failed"
       });
     }
   }

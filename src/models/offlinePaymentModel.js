@@ -18,7 +18,43 @@ const insertOfflinePayment = async (paymentDetails) => {
             transactionDetails
         } = paymentDetails;
 
-        // Using the updated table structure
+        /*
+         * Idempotency guard:
+         * the same member/payment type/reference
+         * must not create another payment record
+         * when the browser retries submission.
+         */
+        const [existingRows] = await pool.query(
+            `SELECT id
+             FROM tblofflinepayments
+             WHERE profile_id = ?
+               AND payment_type = ?
+               AND payment_reference = ?
+             ORDER BY id DESC
+             LIMIT 1`,
+            [
+                profile_id,
+                payment_type,
+                payment_reference
+            ]
+        );
+
+        if (existingRows.length > 0) {
+            console.log(
+                "ℹ️ Existing offline payment reused:",
+                {
+                    profile_id,
+                    payment_type,
+                    payment_reference,
+                    paymentId:
+                        existingRows[0].id
+                }
+            );
+
+            return existingRows[0].id;
+        }
+
+        // Insert a new offline payment record.
         const [result] = await pool.query(
             `INSERT INTO tblofflinepayments 
             (profile_id, amount, payment_type, payment_mode, payment_method, payment_reference, 

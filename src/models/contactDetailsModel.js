@@ -137,10 +137,316 @@ const resetSharedContactsForProfile = async (profileId) => {
     }
 };
 
-module.exports = { 
-    findContactDetails, 
-    recordShare, 
-    countUniqueSharedContacts, 
+const findContactRequest = async (
+    requesterProfileId,
+    targetProfileId
+) => {
+    const query = `
+        SELECT *
+        FROM contact_requests
+        WHERE requester_profile_id = ?
+          AND target_profile_id = ?
+        LIMIT 1
+    `;
+
+    const [rows] = await pool.execute(query, [
+        requesterProfileId,
+        targetProfileId
+    ]);
+
+    return rows.length > 0 ? rows[0] : null;
+};
+
+
+const createOrReopenContactRequest = async ({
+    requesterProfileId,
+    requesterEmail,
+    targetProfileId,
+    requesterMessage = ""
+}) => {
+    const existing = await findContactRequest(
+        requesterProfileId,
+        targetProfileId
+    );
+
+    if (existing) {
+        const currentStatus = (
+            existing.status || ""
+        ).toUpperCase();
+
+        if (currentStatus === "PENDING") {
+            return existing;
+        }
+
+        if (currentStatus === "APPROVED") {
+            return existing;
+        }
+
+        const query = `
+            UPDATE contact_requests
+            SET
+                status = 'PENDING',
+                requester_email = ?,
+                requester_message = ?,
+                moderator_remarks = NULL,
+                reviewed_by = NULL,
+                reviewed_at = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        `;
+
+        await pool.execute(query, [
+            requesterEmail || null,
+            requesterMessage || null,
+            existing.id
+        ]);
+
+        const updated = await getContactRequestById(
+            existing.id
+        );
+
+        return updated;
+    }
+
+    const query = `
+        INSERT INTO contact_requests
+        (
+            requester_profile_id,
+            requester_email,
+            target_profile_id,
+            status,
+            requester_message
+        )
+        VALUES (?, ?, ?, 'PENDING', ?)
+    `;
+
+    const [result] = await pool.execute(query, [
+        requesterProfileId,
+        requesterEmail || null,
+        targetProfileId,
+        requesterMessage || null
+    ]);
+
+    return getContactRequestById(result.insertId);
+};
+
+const listContactRequestsForRequester = async (
+    requesterProfileId
+) => {
+    const query = `
+        SELECT
+            cr.id,
+            cr.requester_profile_id,
+            cr.target_profile_id,
+            cr.status,
+            cr.requester_message,
+            cr.moderator_remarks,
+            cr.reviewed_by,
+            cr.reviewed_at,
+            cr.created_at,
+            cr.updated_at,
+
+            target.name AS target_name
+
+        FROM contact_requests cr
+
+        LEFT JOIN profile target
+            ON target.profile_id =
+               cr.target_profile_id
+
+        WHERE cr.requester_profile_id = ?
+
+        ORDER BY
+            cr.updated_at DESC,
+            cr.id DESC
+    `;
+
+    const [rows] = await pool.execute(
+        query,
+        [requesterProfileId]
+    );
+
+    return rows;
+};
+
+
+const getContactRequestById = async (requestId) => {
+    const query = `
+        SELECT
+            cr.*,
+
+            requester.name AS requester_name,
+            requester.email AS requester_profile_email,
+            requester.phone AS requester_phone,
+
+            target.name AS target_name,
+            target.email AS target_email,
+            target.phone AS target_phone
+
+        FROM contact_requests cr
+
+        LEFT JOIN profile requester
+            ON requester.profile_id =
+               cr.requester_profile_id
+
+        LEFT JOIN profile target
+            ON target.profile_id =
+               cr.target_profile_id
+
+        WHERE cr.id = ?
+        LIMIT 1
+    `;
+
+    const [rows] = await pool.execute(
+        query,
+        [requestId]
+    );
+
+    return rows.length > 0 ? rows[0] : null;
+};
+
+
+const listContactRequests = async (
+    status = "PENDING"
+) => {
+    let query = `
+        SELECT
+            cr.*,
+
+            requester.name AS requester_name,
+            requester.email AS requester_profile_email,
+            requester.phone AS requester_phone,
+            requester.profile_status
+                AS requester_profile_status,
+
+            target.name AS target_name,
+            target.email AS target_email,
+            target.phone AS target_phone,
+            target.profile_status
+                AS target_profile_status
+
+        FROM contact_requests cr
+
+        LEFT JOIN profile requester
+            ON requester.profile_id =
+               cr.requester_profile_id
+
+        LEFT JOIN profile target
+            ON target.profile_id =
+               cr.target_profile_id
+
+        WHERE 1 = 1
+    `;
+
+    const values = [];
+
+    if (status) {
+        query += `
+            AND UPPER(cr.status) = UPPER(?)
+        `;
+        values.push(status);
+    }
+
+    query += `
+        ORDER BY cr.created_at ASC, cr.id ASC
+    `;
+
+    const [rows] = await pool.execute(
+        query,
+        values
+    );
+
+    return rows;
+};
+
+
+const updateContactRequestStatus = async ({
+    requestId,
+    status,
+    moderatorRemarks,
+    reviewedBy
+}) => {
+    const query = `
+        UPDATE contact_requests
+        SET
+            status = ?,
+            moderator_remarks = ?,
+            reviewed_by = ?,
+            reviewed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    `;
+
+    const [result] = await pool.execute(query, [
+        status,
+        moderatorRemarks || null,
+        reviewedBy || null,
+        requestId
+    ]);
+
+    return result.affectedRows > 0;
+};
+
+
+const recordContactRequestHistory = async ({
+    requestId,
+    action,
+    actionBy,
+    remarks
+}) => {
+    const query = `
+        INSERT INTO contact_request_history
+        (
+            contact_request_id,
+            action,
+            action_by,
+            remarks
+        )
+        VALUES (?, ?, ?, ?)
+    `;
+
+    const [result] = await pool.execute(query, [
+        requestId,
+        action,
+        actionBy || null,
+        remarks || null
+    ]);
+
+    return result.insertId;
+};
+
+
+const getContactRequestHistory = async (
+    requestId
+) => {
+    const query = `
+        SELECT *
+        FROM contact_request_history
+        WHERE contact_request_id = ?
+        ORDER BY created_at ASC, id ASC
+    `;
+
+    const [rows] = await pool.execute(
+        query,
+        [requestId]
+    );
+
+    return rows;
+};
+
+module.exports = {
+    findContactDetails,
+    recordShare,
+    countUniqueSharedContacts,
     findExistingShare,
-    resetSharedContactsForProfile
+    resetSharedContactsForProfile,
+
+    findContactRequest,
+    createOrReopenContactRequest,
+    listContactRequestsForRequester,
+    getContactRequestById,
+    listContactRequests,
+    updateContactRequestStatus,
+    recordContactRequestHistory,
+    getContactRequestHistory
 };
