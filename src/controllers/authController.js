@@ -62,14 +62,20 @@ const login = async (req, res) => {
 
   try {
     const user = await UserLogin.findByUserId(userId);
-    console.log("User from database:", user); // DEBUG: Inspect the user object
+    console.log(
+  "[Auth] User lookup:",
+  {
+    found: Boolean(user),
+    userId
+  }
+);
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
-    console.log("Password match:", passwordMatch); // DEBUG: Check password match
+    // Password comparison result intentionally not logged.
 
     if (!passwordMatch) {
       return res.status(401).json({ error: 'Invalid credentials.' });
@@ -90,7 +96,10 @@ const token = jwt.sign(
 
 
     // Include user data in the response
-    console.log("Sending login success response:", { token, user });  // DEBUG
+    console.log(
+  "[Auth] Login successful:",
+  { userId }
+);
     res.status(200).json({ 
       token, 
       user: { 

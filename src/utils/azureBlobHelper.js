@@ -4,7 +4,13 @@ const { BlobServiceClient } = require('@azure/storage-blob');
 // const AZURE_STORAGE_CONNECTION_STRING = 'DefaultEndpointsProtocol=https;AccountName=sakhastore;AccountKey=YOUR_KEY_HERE;End pointSuffix=core.windows.net';
 const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
 
-console.log ("Photo connection string is " +AZURE_STORAGE_CONNECTION_STRING)
+console.log(
+  "[AzureBlobHelper] Storage configuration:",
+  {
+    connectionStringConfigured:
+      Boolean(AZURE_STORAGE_CONNECTION_STRING)
+  }
+);
 const blobServiceClient = BlobServiceClient.fromConnectionString(AZURE_STORAGE_CONNECTION_STRING);
 const containerClient = blobServiceClient.getContainerClient(CONTAINER_NAME);
 

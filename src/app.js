@@ -71,11 +71,6 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Define the absolute path to your static files directory
-const photosDirectory = path.join('D:', '1. Data', '1. Personal DOcument', 'Self Study', 'NewGenApp', 'SMKalyanUI', 'ProfilePhotos');
-
-// Serve static files from the specified directory at the '/ProfilePhotos' route
-app.use('/ProfilePhotos', express.static(photosDirectory));
-console.log('Static files served from:', photosDirectory, 'at route /ProfilePhotos');
 
 // Routes
 

@@ -51,7 +51,18 @@ const getPhotosByEmail = async (email) => {
 };
 
 const getDefaultPhoto = async (profileId) => {
-  const query = "SELECT photo_id, photo_path, filename, url_path FROM profile_photos WHERE profile_id = ? AND is_default = TRUE";
+  const query = `
+    SELECT
+      photo_id,
+      photo_path,
+      filename,
+      url_path
+    FROM profile_photos
+    WHERE profile_id = ?
+      AND is_default = TRUE
+    ORDER BY photo_id DESC
+    LIMIT 1
+  `;
   console.log("Debug (Model - Get Default Photo): Executing SQL:", query, "with values:", [profileId]); // Log get query
   const [rows] = await pool.execute(query, [profileId]);
   console.log("Debug (Model - Get Default Photo): Result row:", rows[0]); // Log get result (single row)

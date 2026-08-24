@@ -5,7 +5,13 @@
         // Retrieve connection string from environment variables for security.
         // It's assumed that `dotenv.config()` is called in your main server file (e.g., server.js).
         const AZURE_STORAGE_CONNECTION_STRING = process.env.AZURE_STORAGE_CONNECTION_STRING;
-console.log("AZURE_STORAGE_CONNECTION_STRING is" + AZURE_STORAGE_CONNECTION_STRING  )
+console.log(
+  "[AzureBlobService] Storage configuration:",
+  {
+    connectionStringConfigured:
+      Boolean(AZURE_STORAGE_CONNECTION_STRING)
+  }
+);
         // Ensure the connection string is available
         if (!AZURE_STORAGE_CONNECTION_STRING) {
           console.error('CRITICAL ERROR: Azure Storage Connection String (AZURE_STORAGE_CONNECTION_STRING) is not set in environment variables.');

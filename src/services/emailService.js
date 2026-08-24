@@ -27,23 +27,9 @@ const EMAIL_PASSWORD_FINGERPRINT =
 console.log(
   "[EmailService] Configuration:",
   {
-    user:
-      EMAIL_USER ||
-      "(not configured)",
-
-    passwordConfigured:
-      Boolean(EMAIL_PASSWORD),
-
-    passwordLength:
-      EMAIL_PASSWORD
-        ? EMAIL_PASSWORD.length
-        : 0,
-
-    passwordFingerprint:
-      EMAIL_PASSWORD_FINGERPRINT,
-
-    from:
-      EMAIL_FROM
+    userConfigured: Boolean(EMAIL_USER),
+    passwordConfigured: Boolean(EMAIL_PASSWORD),
+    from: EMAIL_FROM
   }
 );
 

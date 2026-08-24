@@ -333,10 +333,24 @@ const shareContactDetails = async (
 
         await contactDetailsModel
             .recordContactRequestHistory({
-                requestId: request.id,
-                action: "REQUESTED",
+                requestId:
+                    request.id,
+
+                action:
+                    previousRequest &&
+                    String(
+                        previousRequest.status ||
+                        ""
+                    )
+                        .trim()
+                        .toUpperCase() ===
+                        "CLARIFICATION_REQUIRED"
+                        ? "RESUBMITTED"
+                        : "REQUESTED",
+
                 actionBy:
                     authProfile.email,
+
                 remarks:
                     requesterMessage || ""
             });
@@ -385,13 +399,14 @@ const listMyContactRequests = async (
 
         const requests =
             await contactDetailsModel
-                .listContactRequestsForRequester(
+                .listContactRequestsForMember(
                     authProfile.profileId
                 );
 
         return res.json({
             success: true,
-            count: requests.length,
+            count:
+                requests.length,
             requests
         });
 
@@ -410,7 +425,6 @@ const listMyContactRequests = async (
 };
 
 
-
 const listContactRequests = async (
     req,
     res
@@ -426,10 +440,54 @@ const listContactRequests = async (
                     status
                 );
 
+        /*
+         * Add mutual-interest evidence for
+         * Moderator review without changing
+         * the existing contact-access rules.
+         */
+        const enrichedRequests =
+            await Promise.all(
+                requests.map(
+                    async (
+                        request
+                    ) => {
+                        let mutualInterest =
+                            false;
+
+                        try {
+                            mutualInterest =
+                                await AdvertisementResponseModel
+                                    .hasMutualRelationship(
+                                        request.requester_profile_id,
+                                        request.target_profile_id
+                                    );
+                        } catch (
+                            relationshipError
+                        ) {
+                            console.error(
+                                "⚠️ Unable to verify mutual relationship for contact request:",
+                                request.id,
+                                relationshipError.message
+                            );
+                        }
+
+                        return {
+                            ...request,
+                            mutual_interest:
+                                Boolean(
+                                    mutualInterest
+                                )
+                        };
+                    }
+                )
+            );
+
         return res.json({
             success: true,
-            count: requests.length,
-            requests
+            count:
+                enrichedRequests.length,
+            requests:
+                enrichedRequests
         });
 
     } catch (error) {
@@ -480,6 +538,30 @@ const reviewContactRequest = async (
                 success: false,
                 message:
                     "Action must be APPROVED, REJECTED or CLARIFICATION_REQUIRED."
+            });
+        }
+
+        const normalizedRemarks =
+            String(
+                remarks || ""
+            ).trim();
+
+        if (
+            (
+                normalizedAction ===
+                    "REJECTED" ||
+                normalizedAction ===
+                    "CLARIFICATION_REQUIRED"
+            ) &&
+            !normalizedRemarks
+        ) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    normalizedAction ===
+                        "REJECTED"
+                        ? "Moderator remarks are required when rejecting a contact request."
+                        : "Moderator remarks are required when requesting clarification."
             });
         }
 
@@ -595,7 +677,7 @@ const reviewContactRequest = async (
                 status:
                     normalizedAction,
                 moderatorRemarks:
-                    remarks || "",
+                    normalizedRemarks,
                 reviewedBy:
                     reviewer
             });
@@ -608,7 +690,7 @@ const reviewContactRequest = async (
                 actionBy:
                     reviewer,
                 remarks:
-                    remarks || ""
+                    normalizedRemarks
             });
 
         /*
@@ -650,9 +732,11 @@ const reviewContactRequest = async (
                         `Additional clarification is required for your contact request for ${request.target_name || request.target_profile_id}.`;
                 }
 
-                if (remarks) {
+                if (
+                    normalizedRemarks
+                ) {
                     message +=
-                        `\n\nModerator remarks: ${remarks}`;
+                        `\n\nModerator remarks: ${normalizedRemarks}`;
                 }
 
                 await sendEmailReport({

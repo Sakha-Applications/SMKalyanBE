@@ -269,6 +269,66 @@ const listContactRequestsForRequester = async (
     return rows;
 };
 
+const listContactRequestsForMember = async (
+    memberProfileId
+) => {
+    const query = `
+        SELECT
+            cr.id,
+            cr.requester_profile_id,
+            cr.target_profile_id,
+            cr.status,
+            cr.requester_message,
+            cr.moderator_remarks,
+            cr.reviewed_by,
+            cr.reviewed_at,
+            cr.created_at,
+            cr.updated_at,
+
+            CASE
+                WHEN cr.requester_profile_id = ?
+                    THEN cr.target_profile_id
+                ELSE cr.requester_profile_id
+            END AS other_profile_id,
+
+            CASE
+                WHEN cr.requester_profile_id = ?
+                    THEN target.name
+                ELSE requester.name
+            END AS other_profile_name
+
+        FROM contact_requests cr
+
+        LEFT JOIN profile requester
+            ON requester.profile_id =
+               cr.requester_profile_id
+
+        LEFT JOIN profile target
+            ON target.profile_id =
+               cr.target_profile_id
+
+        WHERE
+            cr.requester_profile_id = ?
+            OR cr.target_profile_id = ?
+
+        ORDER BY
+            cr.updated_at DESC,
+            cr.id DESC
+    `;
+
+    const [rows] =
+        await pool.execute(
+            query,
+            [
+                memberProfileId,
+                memberProfileId,
+                memberProfileId,
+                memberProfileId
+            ]
+        );
+
+    return rows;
+};
 
 const getContactRequestById = async (requestId) => {
     const query = `
@@ -444,6 +504,7 @@ module.exports = {
     findContactRequest,
     createOrReopenContactRequest,
     listContactRequestsForRequester,
+    listContactRequestsForMember,
     getContactRequestById,
     listContactRequests,
     updateContactRequestStatus,

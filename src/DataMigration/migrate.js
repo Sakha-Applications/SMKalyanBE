@@ -284,7 +284,9 @@ async function runMigration() {
                 const userLoginInsertQuery = `INSERT INTO userlogin (${userLoginColumns}) VALUES (${userLoginPlaceholders})`;
                 await transactionConnection.execute(userLoginInsertQuery, userLoginValues);
                 console.log(`   ✅ Inserted user login for ${userLoginData.user_id}.`);
-                console.log(`   🔑 Generated password for ${userLoginData.user_id}: ${plainPassword}`); // LOG THIS CAREFULLY IN PRODUCTION!
+                console.log(
+  `   🔑 Generated initial credential for ${userLoginData.user_id}.`
+);
 
                 // ⚠️ IMPORTANT: Store generated passwords securely if you need to communicate them to users.
                 // For a real migration, you'd save these to a secure file or a temporary table
