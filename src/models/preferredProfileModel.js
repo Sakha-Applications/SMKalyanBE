@@ -14,12 +14,12 @@ class PreferredProfileModel {
         email,
         phone_number,
         member_name,
-        payment_amount = 250.00,
+        payment_amount,
         payment_method,
         payment_reference,
         payment_date,
         payment_time,
-        transaction_details = null
+        member_narrative = null
       } = profileData;
 
       // Calculate validity date (payment_date + 90 days)
@@ -98,7 +98,7 @@ class PreferredProfileModel {
           payment_date,
           payment_time,
           validity_date,
-          transaction_details,
+          member_narrative,
           payment_status,
           review_status,
           moderator_narrative,
@@ -109,7 +109,7 @@ class PreferredProfileModel {
           ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           'PENDING',
           'PENDING',
-          ?,
+          NULL,
           0,
           'pending_payment'
         )
@@ -126,8 +126,7 @@ class PreferredProfileModel {
         payment_date,
         payment_time,
         validity_date,
-        transaction_details,
-        transaction_details
+        member_narrative
       ];
 
       const [result] = await db.execute(query, values);
@@ -156,7 +155,7 @@ class PreferredProfileModel {
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date,
-          transaction_details,
+          member_narrative,
           payment_status,
           review_status,
           moderator_narrative,
@@ -196,7 +195,11 @@ class PreferredProfileModel {
         SELECT
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
-          validity_date, transaction_details, preferred_flag, status,
+          validity_date,
+          member_narrative,
+          moderator_narrative,
+          preferred_flag,
+          status,
           created_at, updated_at,
           DATEDIFF(validity_date, CURDATE()) as days_remaining
         FROM preferred_profiles
@@ -229,8 +232,13 @@ class PreferredProfileModel {
         SELECT
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
-          validity_date, transaction_details, preferred_flag, status,
-          created_at, updated_at,
+          validity_date,
+          member_narrative,
+          moderator_narrative,
+          preferred_flag,
+          status,
+          created_at,
+          updated_at,
           DATEDIFF(validity_date, CURDATE()) as days_remaining
         FROM preferred_profiles
         WHERE status = 'active'
@@ -250,6 +258,317 @@ class PreferredProfileModel {
       throw error;
     }
   }
+  /**
+   * Get all advertisements belonging to one member.
+   *
+   * Includes historical advertisements and response
+   * counts so My Advertisements can act as the
+   * member's advertisement home.
+   */
+  static async getMyAdvertisements(
+    profileId
+  ) {
+    try {
+      const query = `
+        SELECT
+          pp.id,
+          pp.profile_id,
+          pp.member_name,
+          pp.looking_for,
+
+          pp.payment_amount,
+          pp.payment_method,
+          pp.payment_reference,
+          pp.payment_date,
+          pp.payment_time,
+
+          pp.member_narrative,
+          pp.moderator_narrative,
+          pp.moderator_remarks,
+
+          pp.payment_status,
+          pp.review_status,
+          pp.status,
+          pp.preferred_flag,
+
+          pp.validity_date,
+          pp.published_at,
+          pp.reviewed_at,
+          pp.created_at,
+          pp.updated_at,
+
+          DATEDIFF(
+            pp.validity_date,
+            CURDATE()
+          ) AS days_remaining,
+
+          COALESCE(
+            response_counts.total_responses,
+            0
+          ) AS total_responses,
+
+          COALESCE(
+            response_counts.interest_count,
+            0
+          ) AS interest_count,
+
+          COALESCE(
+            response_counts.apply_count,
+            0
+          ) AS apply_count,
+
+          COALESCE(
+            response_counts.mutual_count,
+            0
+          ) AS mutual_count
+
+        FROM preferred_profiles pp
+
+        LEFT JOIN (
+          SELECT
+            advertisement_id,
+
+            COUNT(*) AS total_responses,
+
+            SUM(
+              CASE
+                WHEN UPPER(
+                  IFNULL(
+                    response_type,
+                    ''
+                  )
+                ) = 'INTEREST'
+                THEN 1
+                ELSE 0
+              END
+            ) AS interest_count,
+
+            SUM(
+              CASE
+                WHEN UPPER(
+                  IFNULL(
+                    response_type,
+                    ''
+                  )
+                ) = 'APPLY'
+                THEN 1
+                ELSE 0
+              END
+            ) AS apply_count,
+
+            SUM(
+              CASE
+                WHEN UPPER(
+                  IFNULL(
+                    response_status,
+                    ''
+                  )
+                ) = 'MUTUAL'
+                THEN 1
+                ELSE 0
+              END
+            ) AS mutual_count
+
+          FROM advertisement_responses
+
+          GROUP BY
+            advertisement_id
+        ) response_counts
+          ON response_counts.advertisement_id =
+             pp.id
+
+        WHERE pp.profile_id = ?
+
+        ORDER BY
+          pp.created_at DESC,
+          pp.id DESC
+      `;
+
+      const [rows] =
+        await db.execute(
+          query,
+          [profileId]
+        );
+
+      return rows;
+    } catch (error) {
+      console.error(
+        '[PreferredProfileModel] Error fetching member advertisements:',
+        error
+      );
+
+      throw error;
+    }
+  }
+  /**
+   * Update advertisement narrative by its owner.
+   *
+   * member_narrative contains the member's latest
+   * submitted or edited advertisement text.
+   *
+   * moderator_narrative contains only the
+   * Moderator-approved published version.
+   *
+   * For an ACTIVE advertisement:
+   * - keep moderator_narrative unchanged and live
+   * - store the member revision in member_narrative
+   * - return review_status to PENDING
+   *
+   * For a not-yet-published advertisement:
+   * - update member_narrative only
+   * - moderator_narrative remains reserved for approval.
+   */
+  static async updateMemberAdvertisement({
+    advertisementId,
+    profileId,
+    advertisementText
+  }) {
+    try {
+      const [rows] =
+        await db.execute(
+          `
+            SELECT *
+            FROM preferred_profiles
+            WHERE id = ?
+              AND profile_id = ?
+            LIMIT 1
+          `,
+          [
+            advertisementId,
+            profileId
+          ]
+        );
+
+      if (rows.length === 0) {
+        return null;
+      }
+
+      const advertisement =
+        rows[0];
+
+      const status =
+        String(
+          advertisement.status || ""
+        )
+          .trim()
+          .toLowerCase();
+
+      if (
+        ![
+          "pending_payment",
+          "pending_review",
+          "active",
+          "rejected"
+        ].includes(status)
+      ) {
+        throw new Error(
+          "This advertisement cannot be edited in its current status"
+        );
+      }
+
+      /*
+       * Published advertisement:
+       * keep moderator_narrative unchanged so the
+       * currently approved version remains live.
+       */
+      if (status === "active") {
+        await db.execute(
+          `
+            UPDATE preferred_profiles
+            SET
+              member_narrative = ?,
+              review_status = 'PENDING',
+              moderator_remarks = NULL,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND profile_id = ?
+          `,
+          [
+            advertisementText,
+            advertisementId,
+            profileId
+          ]
+        );
+
+        return this.getPreferredProfileById(
+          advertisementId
+        );
+      }
+
+      /*
+       * Advertisement rejected after payment:
+       * a member correction returns it to Moderator review.
+       */
+      if (status === "rejected") {
+        await db.execute(
+          `
+            UPDATE preferred_profiles
+            SET
+              member_narrative = ?,
+              moderator_narrative = NULL,
+              moderator_remarks = NULL,
+              review_status = 'PENDING',
+              status = 'pending_review',
+              preferred_flag = 0,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND profile_id = ?
+          `,
+          [
+            advertisementText,
+            advertisementId,
+            profileId
+          ]
+        );
+
+        return this.getPreferredProfileById(
+          advertisementId
+        );
+      }
+
+      /*
+       * Pending payment / initial review:
+       * store the member's latest advertisement
+       * only in member_narrative.
+       *
+       * moderator_narrative remains reserved for
+       * Moderator-approved published content.
+       */
+      await db.execute(
+        `
+          UPDATE preferred_profiles
+          SET
+            member_narrative = ?,
+            moderator_remarks = NULL,
+            review_status =
+              CASE
+                WHEN status = 'pending_review'
+                  THEN 'PENDING'
+                ELSE review_status
+              END,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+            AND profile_id = ?
+        `,
+        [
+          advertisementText,
+          advertisementId,
+          profileId
+        ]
+      );
+
+      return this.getPreferredProfileById(
+        advertisementId
+      );
+    } catch (error) {
+      console.error(
+        "[PreferredProfileModel] Error updating member advertisement:",
+        error
+      );
+
+      throw error;
+    }
+  }
 
   /**
    * Get preferred profiles by email
@@ -263,7 +582,7 @@ class PreferredProfileModel {
           id, profile_id, email, phone_number, member_name, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date,
-          transaction_details,
+          member_narrative,
           payment_status,
           review_status,
           moderator_narrative,
@@ -317,25 +636,90 @@ class PreferredProfileModel {
   }
 
   /**
-   * Cancel preferred profile (manual cancellation)
-   * @param {string} profileId - Profile ID
-   * @returns {Promise<boolean>} Success status
+   * Cancel or withdraw one advertisement
+   * owned by a member.
+   *
+   * No record is deleted. Payment, narrative,
+   * publication and response history remain intact.
    */
-  static async cancelPreferredProfile(profileId) {
+  static async cancelMemberAdvertisement({
+    advertisementId,
+    profileId
+  }) {
     try {
-      const query = `
-        UPDATE preferred_profiles
-        SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP
-        WHERE profile_id = ? AND status = 'active'
-      `;
+      const [rows] =
+        await db.execute(
+          `
+            SELECT
+              id,
+              profile_id,
+              status
+            FROM preferred_profiles
+            WHERE id = ?
+              AND profile_id = ?
+            LIMIT 1
+          `,
+          [
+            advertisementId,
+            profileId
+          ]
+        );
 
-      const [result] = await db.execute(query, [profileId]);
+      if (rows.length === 0) {
+        return null;
+      }
 
-      console.log(`[PreferredProfileModel] Cancelled preferred profile for ${profileId}`);
+      const advertisement =
+        rows[0];
 
-      return result.affectedRows > 0;
+      const status =
+        String(
+          advertisement.status || ""
+        )
+          .trim()
+          .toLowerCase();
+
+      if (
+        ![
+          "pending_payment",
+          "pending_review",
+          "active"
+        ].includes(status)
+      ) {
+        throw new Error(
+          "This advertisement cannot be cancelled in its current status"
+        );
+      }
+
+      await db.execute(
+        `
+          UPDATE preferred_profiles
+          SET
+            status = 'cancelled',
+            preferred_flag = 0,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+            AND profile_id = ?
+        `,
+        [
+          advertisementId,
+          profileId
+        ]
+      );
+
+      console.log(
+        `[PreferredProfileModel] Cancelled advertisement ${advertisementId} for ${profileId}`
+      );
+
+      return this.getPreferredProfileById(
+        advertisementId
+      );
     } catch (error) {
-      console.error('[PreferredProfileModel] Error cancelling preferred profile:', error);
+      console.error(
+        "[PreferredProfileModel] Error cancelling member advertisement:",
+        error
+      );
+
       throw error;
     }
   }
@@ -435,9 +819,9 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
           pp.member_name,
           pp.looking_for,
 
-          COALESCE(
-            NULLIF(pp.moderator_narrative, ''),
-            pp.transaction_details
+          NULLIF(
+            pp.moderator_narrative,
+            ''
           ) AS transaction_details,
 
           DATEDIFF(
@@ -509,9 +893,9 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
           pp.profile_id,
           pp.member_name,
           pp.looking_for,
-          COALESCE(
-            NULLIF(pp.moderator_narrative, ''),
-            pp.transaction_details
+          NULLIF(
+            pp.moderator_narrative,
+            ''
           ) AS transaction_details,
           pp.payment_amount,
           pp.validity_date,
@@ -641,7 +1025,7 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
         pp.payment_reference,
         pp.payment_date,
         pp.payment_time,
-        pp.transaction_details,
+        pp.member_narrative,
         pp.moderator_narrative,
         pp.payment_status,
         pp.review_status,
@@ -668,7 +1052,18 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
       LEFT JOIN profile p
         ON p.profile_id = pp.profile_id
 
-      WHERE pp.status = 'pending_review'
+      WHERE (
+          pp.status = 'pending_review'
+          OR (
+            pp.status = 'active'
+            AND UPPER(
+              IFNULL(
+                pp.review_status,
+                ''
+              )
+            ) = 'PENDING'
+          )
+        )
         AND UPPER(
           IFNULL(
             pp.payment_status,
@@ -810,30 +1205,66 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
     if (
       normalizedAction === "REJECT"
     ) {
-      await db.execute(
-        `
-          UPDATE preferred_profiles
-          SET
-            moderator_narrative = ?,
-            moderator_remarks = ?,
-            review_status = 'REJECTED',
-            status = 'rejected',
-            preferred_flag = 0,
-            reviewed_by = ?,
-            reviewed_at = CURRENT_TIMESTAMP,
-            updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `,
-        [
-          moderatorNarrative ||
-            advertisement.moderator_narrative ||
-            advertisement.transaction_details ||
-            "",
-          moderatorRemarks || null,
-          reviewedBy || null,
-          advertisementId
-        ]
-      );
+      const wasAlreadyPublished =
+        String(
+          advertisement.status || ""
+        )
+          .trim()
+          .toLowerCase() === "active" &&
+        Boolean(
+          advertisement.published_at
+        );
+
+      if (wasAlreadyPublished) {
+        /*
+         * Reject only the proposed revision.
+         * Keep the previously approved advertisement
+         * live and preserve moderator_narrative.
+         */
+        await db.execute(
+          `
+            UPDATE preferred_profiles
+            SET
+              moderator_remarks = ?,
+              review_status = 'REJECTED',
+              status = 'active',
+              preferred_flag = 1,
+              reviewed_by = ?,
+              reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `,
+          [
+            moderatorRemarks || null,
+            reviewedBy || null,
+            advertisementId
+          ]
+        );
+      } else {
+        /*
+         * Initial advertisement rejected before
+         * publication.
+         */
+        await db.execute(
+          `
+            UPDATE preferred_profiles
+            SET
+              moderator_remarks = ?,
+              review_status = 'REJECTED',
+              status = 'rejected',
+              preferred_flag = 0,
+              reviewed_by = ?,
+              reviewed_at = CURRENT_TIMESTAMP,
+              updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `,
+          [
+            moderatorRemarks || null,
+            reviewedBy || null,
+            advertisementId
+          ]
+        );
+      }
 
       return this.getPreferredProfileById(
         advertisementId
@@ -845,6 +1276,16 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
      * approves the advertisement, not when the
      * member submitted payment details.
      */
+    const wasAlreadyPublished =
+      String(
+        advertisement.status || ""
+      )
+        .trim()
+        .toLowerCase() === "active" &&
+      Boolean(
+        advertisement.published_at
+      );
+
     await db.execute(
       `
         UPDATE preferred_profiles
@@ -854,21 +1295,40 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
           review_status = 'APPROVED',
           status = 'active',
           preferred_flag = 1,
+
           validity_date =
-            DATE_ADD(CURDATE(), INTERVAL 90 DAY),
+            CASE
+              WHEN ? = 1
+                THEN validity_date
+              ELSE DATE_ADD(
+                CURDATE(),
+                INTERVAL 90 DAY
+              )
+            END,
+
           reviewed_by = ?,
           reviewed_at = CURRENT_TIMESTAMP,
-          published_at = CURRENT_TIMESTAMP,
+
+          published_at =
+            CASE
+              WHEN ? = 1
+                THEN published_at
+              ELSE CURRENT_TIMESTAMP
+            END,
+
           updated_at = CURRENT_TIMESTAMP
+
         WHERE id = ?
       `,
       [
         moderatorNarrative ||
+          advertisement.member_narrative ||
           advertisement.moderator_narrative ||
-          advertisement.transaction_details ||
           "",
         moderatorRemarks || null,
+        wasAlreadyPublished ? 1 : 0,
         reviewedBy || null,
+        wasAlreadyPublished ? 1 : 0,
         advertisementId
       ]
     );

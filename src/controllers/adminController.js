@@ -159,47 +159,159 @@ const getAdminSettings = async (req, res) => {
   }
 };
 
-// ✅ NEW: Update admin-configurable settings
+// ✅ Update admin-configurable settings
 const updateAdminSettings = async (req, res) => {
   try {
     const body = req.body || {};
     const payload = {};
 
-    // Only accept known keys
+    // Only accept known configurable keys.
     const KEYS = adminSettingsModel.KEYS;
 
     if (body[KEYS.REGISTRATION_FEE_AMOUNT] !== undefined) {
-      payload[KEYS.REGISTRATION_FEE_AMOUNT] = body[KEYS.REGISTRATION_FEE_AMOUNT];
-    }
-    if (body[KEYS.CONTACT_VIEWS_PER_CYCLE] !== undefined) {
-      payload[KEYS.CONTACT_VIEWS_PER_CYCLE] = body[KEYS.CONTACT_VIEWS_PER_CYCLE];
-    }
-    if (body[KEYS.RECHARGE_FEE_AMOUNT] !== undefined) {
-      payload[KEYS.RECHARGE_FEE_AMOUNT] = body[KEYS.RECHARGE_FEE_AMOUNT];
+      payload[KEYS.REGISTRATION_FEE_AMOUNT] =
+        body[KEYS.REGISTRATION_FEE_AMOUNT];
     }
 
-    // Basic numeric validation (non-breaking)
-    const toNum = (v) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
+    if (body[KEYS.CONTACT_VIEWS_PER_CYCLE] !== undefined) {
+      payload[KEYS.CONTACT_VIEWS_PER_CYCLE] =
+        body[KEYS.CONTACT_VIEWS_PER_CYCLE];
+    }
+
+    if (body[KEYS.RECHARGE_FEE_AMOUNT] !== undefined) {
+      payload[KEYS.RECHARGE_FEE_AMOUNT] =
+        body[KEYS.RECHARGE_FEE_AMOUNT];
+    }
+
+    if (body[KEYS.ADVERTISEMENT_MIN_CONTRIBUTION] !== undefined) {
+      payload[KEYS.ADVERTISEMENT_MIN_CONTRIBUTION] =
+        body[KEYS.ADVERTISEMENT_MIN_CONTRIBUTION];
+    }
+
+    const hasValue = (value) =>
+      value !== undefined &&
+      value !== null &&
+      String(value).trim() !== "";
+
+    const toNum = (value) => {
+      if (!hasValue(value)) {
+        return null;
+      }
+
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
     };
 
-    const regAmt = payload[KEYS.REGISTRATION_FEE_AMOUNT] !== undefined ? toNum(payload[KEYS.REGISTRATION_FEE_AMOUNT]) : null;
-    const views = payload[KEYS.CONTACT_VIEWS_PER_CYCLE] !== undefined ? toNum(payload[KEYS.CONTACT_VIEWS_PER_CYCLE]) : null;
-    const rechAmt = payload[KEYS.RECHARGE_FEE_AMOUNT] !== undefined ? toNum(payload[KEYS.RECHARGE_FEE_AMOUNT]) : null;
+    // --------------------------------------------------------
+    // Registration fee
+    // --------------------------------------------------------
 
-    if (regAmt !== null && regAmt < 0) {
-      return res.status(400).json({ success: false, message: "REGISTRATION_FEE_AMOUNT must be >= 0" });
-    }
-    if (rechAmt !== null && rechAmt < 0) {
-      return res.status(400).json({ success: false, message: "RECHARGE_FEE_AMOUNT must be >= 0" });
-    }
-    if (views !== null && (!Number.isInteger(views) || views <= 0)) {
-      return res.status(400).json({ success: false, message: "CONTACT_VIEWS_PER_CYCLE must be a positive integer" });
+    if (payload[KEYS.REGISTRATION_FEE_AMOUNT] !== undefined) {
+      const regAmt = toNum(
+        payload[KEYS.REGISTRATION_FEE_AMOUNT]
+      );
+
+      if (regAmt === null || regAmt < 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "REGISTRATION_FEE_AMOUNT must be a number greater than or equal to 0"
+        });
+      }
+
+      payload[KEYS.REGISTRATION_FEE_AMOUNT] =
+        String(regAmt);
     }
 
-    const result = await adminSettingsModel.upsertSettings(payload);
-    const updatedSettings = await adminSettingsModel.getSettings();
+    // --------------------------------------------------------
+    // Contact views per cycle
+    // --------------------------------------------------------
+
+    if (payload[KEYS.CONTACT_VIEWS_PER_CYCLE] !== undefined) {
+      const views = toNum(
+        payload[KEYS.CONTACT_VIEWS_PER_CYCLE]
+      );
+
+      if (
+        views === null ||
+        !Number.isInteger(views) ||
+        views <= 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "CONTACT_VIEWS_PER_CYCLE must be a positive integer"
+        });
+      }
+
+      payload[KEYS.CONTACT_VIEWS_PER_CYCLE] =
+        String(views);
+    }
+
+    // --------------------------------------------------------
+    // Recharge fee
+    // --------------------------------------------------------
+
+    if (payload[KEYS.RECHARGE_FEE_AMOUNT] !== undefined) {
+      const rechargeAmt = toNum(
+        payload[KEYS.RECHARGE_FEE_AMOUNT]
+      );
+
+      if (rechargeAmt === null || rechargeAmt < 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "RECHARGE_FEE_AMOUNT must be a number greater than or equal to 0"
+        });
+      }
+
+      payload[KEYS.RECHARGE_FEE_AMOUNT] =
+        String(rechargeAmt);
+    }
+
+    // --------------------------------------------------------
+    // Minimum advertisement contribution
+    // --------------------------------------------------------
+
+    if (
+      payload[KEYS.ADVERTISEMENT_MIN_CONTRIBUTION] !==
+      undefined
+    ) {
+      const advertisementMin = toNum(
+        payload[
+          KEYS.ADVERTISEMENT_MIN_CONTRIBUTION
+        ]
+      );
+
+      if (
+        advertisementMin === null ||
+        advertisementMin < 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "ADVERTISEMENT_MIN_CONTRIBUTION must be a number greater than or equal to 0"
+        });
+      }
+
+      payload[
+        KEYS.ADVERTISEMENT_MIN_CONTRIBUTION
+      ] = String(advertisementMin);
+    }
+
+    // Nothing supplied.
+    if (Object.keys(payload).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid admin settings supplied"
+      });
+    }
+
+    const result =
+      await adminSettingsModel.upsertSettings(payload);
+
+    const updatedSettings =
+      await adminSettingsModel.getSettings();
 
     return res.json({
       success: true,
@@ -209,9 +321,11 @@ const updateAdminSettings = async (req, res) => {
     });
   } catch (err) {
     console.error("❌ updateAdminSettings error:", err);
+
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error while updating admin settings"
+      message:
+        "Internal Server Error while updating admin settings"
     });
   }
 };

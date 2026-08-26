@@ -13,6 +13,9 @@ const { resetSharedContactsForProfile } = require('../models/contactDetailsModel
 const PreferredProfileModel =
     require('../models/preferredProfileModel');
 
+const adminSettingsModel =
+    require('../models/adminSettingsModel');
+
 // Handle submission of offline payment details
 const submitOfflinePayment = async (req, res) => {
     try {
@@ -42,6 +45,79 @@ const submitOfflinePayment = async (req, res) => {
                 success: false,
                 message: 'Missing required payment details. Please provide amount, payment date, time, and either phone or email.'
             });
+        }
+
+        /*
+         * Advertisement payment validation.
+         *
+         * Admin configures the minimum contribution.
+         * Member may submit that amount or anything higher.
+         */
+        if (
+            payment_type ===
+            'PreferredProfile'
+        ) {
+            const settings =
+                await adminSettingsModel
+                    .getSettings();
+
+            const configuredMinimum =
+                settings[
+                    adminSettingsModel
+                        .KEYS
+                        .ADVERTISEMENT_MIN_CONTRIBUTION
+                ];
+
+            if (
+                configuredMinimum ===
+                    undefined ||
+                configuredMinimum ===
+                    null ||
+                String(
+                    configuredMinimum
+                ).trim() === ''
+            ) {
+                return res.status(503).json({
+                    success: false,
+                    message:
+                        'Advertisement contribution is not configured. Please contact the administrator.'
+                });
+            }
+
+            const minimumContribution =
+                Number(
+                    configuredMinimum
+                );
+
+            const submittedAmount =
+                Number(amount);
+
+            if (
+                !Number.isFinite(
+                    minimumContribution
+                ) ||
+                minimumContribution < 0
+            ) {
+                return res.status(500).json({
+                    success: false,
+                    message:
+                        'Advertisement contribution configuration is invalid.'
+                });
+            }
+
+            if (
+                !Number.isFinite(
+                    submittedAmount
+                ) ||
+                submittedAmount <
+                    minimumContribution
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message:
+                        `Advertisement contribution must be at least ₹${minimumContribution}.`
+                });
+            }
         }
 
         // ✅ Gate: Recharge allowed ONLY for APPROVED profiles

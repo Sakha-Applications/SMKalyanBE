@@ -1,6 +1,76 @@
-const PreferredProfileModel = require('../models/preferredProfileModel');
+const PreferredProfileModel =
+  require('../models/preferredProfileModel');
+
+const adminSettingsModel =
+  require('../models/adminSettingsModel');
+
+const ADVERTISEMENT_MAX_LENGTH = 1000;
 
 class PreferredProfileController {
+
+    /**
+   * Get the Admin-configured minimum advertisement contribution.
+   * GET /api/preferred-profiles/minimum-contribution
+   */
+  static async getAdvertisementMinimumContribution(
+    req,
+    res
+  ) {
+    try {
+      const settings =
+        await adminSettingsModel.getSettings();
+
+      const rawValue =
+        settings[
+          adminSettingsModel.KEYS
+            .ADVERTISEMENT_MIN_CONTRIBUTION
+        ];
+
+      if (
+        rawValue === undefined ||
+        rawValue === null ||
+        String(rawValue).trim() === ""
+      ) {
+        return res.status(503).json({
+          success: false,
+          message:
+            "Minimum advertisement contribution has not been configured by Admin."
+        });
+      }
+
+      const minimumContribution =
+        Number(rawValue);
+
+      if (
+        !Number.isFinite(
+          minimumContribution
+        ) ||
+        minimumContribution < 0
+      ) {
+        return res.status(500).json({
+          success: false,
+          message:
+            "Minimum advertisement contribution configuration is invalid."
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        minimumContribution
+      });
+    } catch (error) {
+      console.error(
+        "[PreferredProfileController] Unable to load advertisement minimum contribution:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Unable to load advertisement contribution settings."
+      });
+    }
+  }
 
   /**
    * Create a new preferred profile record
@@ -20,32 +90,140 @@ class PreferredProfileController {
         payment_reference,
         payment_date,
         payment_time,
-        transaction_details
+        member_narrative
       } = req.body;
 
-      // Validation
-      if (!profile_id || !email || !phone_number || !member_name || !payment_method || !payment_reference) {
+      // Required-field validation.
+      if (
+        !profile_id ||
+        !email ||
+        !phone_number ||
+        !member_name ||
+        !payment_method ||
+        !payment_reference
+      ) {
         return res.status(400).json({
           success: false,
-          message: 'Missing required fields: profile_id, email, phone_number, member_name, payment_method, payment_reference'
+          message:
+            'Missing required fields: profile_id, email, phone_number, member_name, payment_method, payment_reference'
         });
+      }
 
-    
+      /*
+       * Advertisement contribution is controlled
+       * by the Admin-configured minimum.
+       *
+       * Members may pay the configured minimum
+       * or any higher amount.
+       */
+      const settings =
+        await adminSettingsModel.getSettings();
+
+      const configuredMinimum =
+        settings[
+          adminSettingsModel.KEYS
+            .ADVERTISEMENT_MIN_CONTRIBUTION
+        ];
+
+      if (
+        configuredMinimum === undefined ||
+        configuredMinimum === null ||
+        String(
+          configuredMinimum
+        ).trim() === ""
+      ) {
+        return res.status(503).json({
+          success: false,
+          message:
+            "Advertisement contribution is not configured. Please contact the administrator."
+        });
+      }
+
+      const minimumContribution =
+        Number(configuredMinimum);
+
+      const submittedAmount =
+        Number(payment_amount);
+
+      if (
+        !Number.isFinite(
+          minimumContribution
+        ) ||
+        minimumContribution < 0
+      ) {
+        return res.status(500).json({
+          success: false,
+          message:
+            "Advertisement contribution configuration is invalid."
+        });
+      }
+
+      if (
+        !Number.isFinite(
+          submittedAmount
+        ) ||
+        submittedAmount <
+          minimumContribution
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Advertisement contribution must be at least ₹${minimumContribution}.`
+        });
+      }
+
+      const normalizedMemberNarrative =
+        String(
+          member_narrative || ""
+        ).trim();
+
+      if (!normalizedMemberNarrative) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Advertisement text is required."
+        });
+      }
+
+      if (
+        normalizedMemberNarrative.length >
+        ADVERTISEMENT_MAX_LENGTH
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Advertisement text cannot exceed ${ADVERTISEMENT_MAX_LENGTH} characters.`
+        });
       }
 
       // Create preferred profile record
-      const createdRecord = await PreferredProfileModel.createPreferredProfile({
-        profile_id,
-        email,
-        phone_number,
-        member_name,
-        payment_amount: payment_amount || 250.00,
-        payment_method,
-        payment_reference,
-        payment_date: payment_date || new Date().toISOString().split('T')[0],
-        payment_time: payment_time || new Date().toTimeString().split(' ')[0],
-        transaction_details
-      });
+      const createdRecord =
+        await PreferredProfileModel
+          .createPreferredProfile({
+            profile_id,
+            email,
+            phone_number,
+            member_name,
+            payment_amount:
+              submittedAmount,
+            payment_method,
+            payment_reference,
+
+            payment_date:
+              payment_date ||
+              new Date()
+                .toISOString()
+                .split('T')[0],
+
+            payment_time:
+              payment_time ||
+              new Date()
+                .toTimeString()
+                .split(' ')[0],
+
+            member_narrative:
+              normalizedMemberNarrative
+          });
 
       console.log('[PreferredProfileController] Successfully created preferred profile:', createdRecord.profile_id);
 
@@ -58,10 +236,18 @@ class PreferredProfileController {
     } catch (error) {
       console.error('[PreferredProfileController] Error creating preferred profile:', error);
       
-      if (error.message.includes('already has an active preferred status')) {
+      if (
+        error.message.includes(
+          'advertisement in progress or active'
+        ) ||
+        error.message.includes(
+          'active preferred status'
+        )
+      ) {
         return res.status(409).json({
           success: false,
-          message: 'Profile already has an active preferred status'
+          message:
+            'You already have an advertisement in progress or currently active. Please use My Advertisements to review or manage your existing advertisement.'
         });
       }
 
@@ -69,6 +255,174 @@ class PreferredProfileController {
         success: false,
         message: 'Internal server error while creating preferred profile',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+  /**
+   * Get advertisements belonging to the
+   * currently authenticated member.
+   *
+   * GET /api/preferred-profiles/my-advertisements
+   */
+  static async getMyAdvertisements(
+    req,
+    res
+  ) {
+    try {
+      const profileId =
+        req.user?.profile_id ||
+        req.user?.profileId ||
+        req.user?.id;
+
+      if (!profileId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Authenticated Profile ID is required."
+        });
+      }
+
+      const advertisements =
+        await PreferredProfileModel
+          .getMyAdvertisements(
+            profileId
+          );
+
+      return res.status(200).json({
+        success: true,
+        data: advertisements,
+        meta: {
+          count:
+            advertisements.length
+        }
+      });
+    } catch (error) {
+      console.error(
+        "[PreferredProfileController] Unable to load member advertisements:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Unable to load your advertisements."
+      });
+    }
+  }
+  /**
+   * Update an advertisement owned by the
+   * currently authenticated member.
+   *
+   * PUT /api/preferred-profiles/my-advertisements/:id
+   */
+  static async updateMyAdvertisement(
+    req,
+    res
+  ) {
+    try {
+      const profileId =
+        req.user?.profile_id ||
+        req.user?.profileId ||
+        req.user?.id;
+
+      const advertisementId =
+        Number(req.params?.id);
+
+      const advertisementText =
+        String(
+          req.body?.advertisementText ||
+          ""
+        ).trim();
+
+      if (!profileId) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Authenticated Profile ID is required."
+        });
+      }
+
+      if (
+        !Number.isInteger(
+          advertisementId
+        ) ||
+        advertisementId <= 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Valid Advertisement ID is required."
+        });
+      }
+
+      if (!advertisementText) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Advertisement text is required."
+        });
+      }
+
+      if (
+        advertisementText.length >
+        ADVERTISEMENT_MAX_LENGTH
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Advertisement text cannot exceed ${ADVERTISEMENT_MAX_LENGTH} characters.`
+        });
+      }
+
+      const updated =
+        await PreferredProfileModel
+          .updateMemberAdvertisement({
+            advertisementId,
+            profileId,
+            advertisementText
+          });
+
+      if (!updated) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Advertisement was not found."
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message:
+          String(updated.status || "")
+            .toLowerCase() ===
+          "active"
+            ? "Your changes have been submitted for Moderator review. The currently approved advertisement will remain published until the revision is approved."
+            : "Advertisement updated and submitted for review.",
+        data: updated
+      });
+    } catch (error) {
+      console.error(
+        "[PreferredProfileController] Unable to update member advertisement:",
+        error
+      );
+
+      if (
+        String(error.message || "")
+          .includes(
+            "cannot be edited"
+          )
+      ) {
+        return res.status(409).json({
+          success: false,
+          message:
+            error.message
+        });
+      }
+
+      return res.status(500).json({
+        success: false,
+        message:
+          "Unable to update your advertisement."
       });
     }
   }
@@ -278,7 +632,7 @@ class PreferredProfileController {
       let profiles;
       
       if (format === 'ticker') {
-        // For ticker: simplified data with transaction_details
+        // For ticker: simplified data with the Moderator-approved published narrative.
         profiles = await PreferredProfileModel.getPreferredProfilesForDisplay(limit, 'ticker');
       } else if (format === 'cards') {
         // For cards: more detailed data
@@ -352,40 +706,94 @@ class PreferredProfileController {
   }
 
   /**
-   * Cancel preferred profile
-   * PUT /api/preferred-profiles/cancel/:profileId
+   * Cancel or withdraw an advertisement owned
+   * by the currently authenticated member.
+   *
+   * PUT /api/preferred-profiles/my-advertisements/:id/cancel
    */
-  static async cancelPreferredProfile(req, res) {
+  static async cancelMyAdvertisement(
+    req,
+    res
+  ) {
     try {
-      const { profileId } = req.params;
+      const profileId =
+        req.user?.profile_id ||
+        req.user?.profileId ||
+        req.user?.id;
+
+      const advertisementId =
+        Number(
+          req.params?.id
+        );
 
       if (!profileId) {
         return res.status(400).json({
           success: false,
-          message: 'Profile ID is required'
+          message:
+            "Authenticated Profile ID is required."
         });
       }
 
-      const cancelled = await PreferredProfileModel.cancelPreferredProfile(profileId);
+      if (
+        !Number.isInteger(
+          advertisementId
+        ) ||
+        advertisementId <= 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Valid Advertisement ID is required."
+        });
+      }
+
+      const cancelled =
+        await PreferredProfileModel
+          .cancelMemberAdvertisement({
+            advertisementId,
+            profileId
+          });
 
       if (!cancelled) {
         return res.status(404).json({
           success: false,
-          message: 'No active preferred profile found to cancel'
+          message:
+            "Advertisement was not found."
         });
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
-        message: 'Preferred profile cancelled successfully'
+        message:
+          "Advertisement cancelled successfully. It will no longer appear in Matrimonial Spotlight.",
+        data:
+          cancelled
       });
 
     } catch (error) {
-      console.error('[PreferredProfileController] Error cancelling preferred profile:', error);
-      res.status(500).json({
+      console.error(
+        "[PreferredProfileController] Unable to cancel member advertisement:",
+        error
+      );
+
+      if (
+        String(
+          error?.message || ""
+        ).includes(
+          "cannot be cancelled"
+        )
+      ) {
+        return res.status(409).json({
+          success: false,
+          message:
+            error.message
+        });
+      }
+
+      return res.status(500).json({
         success: false,
-        message: 'Internal server error while cancelling preferred profile',
-        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        message:
+          "Unable to cancel your advertisement."
       });
     }
   }

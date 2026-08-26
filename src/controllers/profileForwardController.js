@@ -70,7 +70,9 @@ const forwardProfileByEmail =
       const {
         targetProfileId,
         recipientEmail,
-        senderMessage
+        senderMessage,
+        advertisementId,
+        advertisementText
       } = req.body || {};
 
       const normalizedRecipientEmail =
@@ -237,8 +239,23 @@ const forwardProfileByEmail =
           .trim()
           .slice(0, 1000);
 
+      const safeAdvertisementText =
+        String(
+          advertisementText || ""
+        )
+          .trim()
+          .slice(0, 1000);
+
+      const isAdvertisementForward =
+        Boolean(
+          advertisementId &&
+          safeAdvertisementText
+        );
+
       const subject =
-        `${senderName} shared a matrimonial profile on Kalyana Sakha`;
+        isAdvertisementForward
+          ? `${senderName} shared a matrimonial advertisement on Kalyana Sakha`
+          : `${senderName} shared a matrimonial profile on Kalyana Sakha`;
 
       const summaryParts = [
         safeSummary.age
@@ -272,13 +289,24 @@ const forwardProfileByEmail =
       const textLines = [
         "Namaskara,",
         "",
-        `${senderName} has shared a matrimonial profile with you on Kalyana Sakha.`,
+        isAdvertisementForward
+          ? `${senderName} has shared a matrimonial advertisement with you on Kalyana Sakha.`
+          : `${senderName} has shared a matrimonial profile with you on Kalyana Sakha.`,
         "",
         `Profile: ${safeSummary.name} (${safeSummary.profileId})`,
         summaryText
           ? `Summary: ${summaryText}`
           : ""
       ].filter(Boolean);
+
+            if (isAdvertisementForward) {
+        textLines.push(
+          "",
+          "Advertisement:",
+          safeAdvertisementText
+        );
+      }
+
 
       if (safeMessage) {
         textLines.push(
@@ -318,7 +346,10 @@ const forwardProfileByEmail =
 
           <p>
             <strong>${escapeHtml(senderName)}</strong>
-            has shared a matrimonial profile
+            has shared a matrimonial
+            ${isAdvertisementForward
+              ? "advertisement"
+              : "profile"}
             with you on Kalyana Sakha.
           </p>
 
@@ -342,6 +373,22 @@ const forwardProfileByEmail =
                 : ""
             }
           </div>
+
+          ${
+            isAdvertisementForward
+              ? `
+                <div style="border:1px solid #E4E1D9;border-radius:12px;padding:16px;margin:16px 0;background:#FFF4D6;">
+                  <div style="font-weight:700;margin-bottom:8px;">
+                    Matrimonial Advertisement
+                  </div>
+
+                  <div>
+                    ${escapeHtml(safeAdvertisementText)}
+                  </div>
+                </div>
+              `
+              : ""
+          }
 
           ${
             safeMessage

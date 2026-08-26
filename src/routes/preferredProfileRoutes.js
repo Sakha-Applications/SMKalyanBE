@@ -68,10 +68,41 @@ router.put(
 /**
  * User-only endpoints (LOCKED until APPROVED)
  */
-router.get('/profile/:profileId', requireAuth, requireApprovedProfile, PreferredProfileController.getActivePreferredProfile);
+router.get(
+  '/my-advertisements',
+  requireAuth,
+  requireApprovedProfile,
+  PreferredProfileController.getMyAdvertisements
+);
+
+router.put(
+  '/my-advertisements/:id',
+  requireAuth,
+  requireApprovedProfile,
+  PreferredProfileController.updateMyAdvertisement
+);
+router.put(
+  '/my-advertisements/:id/cancel',
+  requireAuth,
+  requireApprovedProfile,
+  PreferredProfileController.cancelMyAdvertisement
+);
+router.get(
+  '/minimum-contribution',
+  requireAuth,
+  requireApprovedProfile,
+  PreferredProfileController.getAdvertisementMinimumContribution
+);
+
+router.get(
+  '/profile/:profileId',
+  requireAuth,
+  requireApprovedProfile,
+  PreferredProfileController.getActivePreferredProfile
+);
 router.get('/email/:email', requireAuth, requireApprovedProfile, PreferredProfileController.getPreferredProfilesByEmail);
 router.get('/:id', requireAuth, requireApprovedProfile, PreferredProfileController.getPreferredProfileById);
-router.put('/cancel/:profileId', requireAuth, requireApprovedProfile, PreferredProfileController.cancelPreferredProfile);
+
 
 // Error handling middleware for this router
 router.use((error, req, res, next) => {
