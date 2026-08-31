@@ -18,6 +18,8 @@ const {
   createResponse,
   getMyAdvertisementResponses,
   getMySentAdvertisementResponses,
+  applyAfterShortlist,
+  updateConvenientTime,
   updateAdvertisementResponse
 } =
   require(
@@ -48,6 +50,18 @@ router.get(
   getMySentAdvertisementResponses
 );
 
+router.put(
+  "/:responseId/apply",
+  requireAuth,
+  requireApprovedProfile,
+  applyAfterShortlist
+);
+router.put(
+  "/:responseId/convenient-time",
+  requireAuth,
+  requireApprovedProfile,
+  updateConvenientTime
+);
 
 router.put(
   "/:responseId/status",

@@ -78,10 +78,14 @@ const searchProfiles = async (
   maritalStatus,
   motherTongue,
   gotra,
+  rashi,
+  nakshatra,
   subCaste,
   guruMatha,
   currentCityOfResidence,
   income,
+  education,
+  profession,
   traditionalValues,
   currentLocationCountry,
   currentLocationState,
@@ -99,11 +103,16 @@ const searchProfiles = async (
     const _maritalStatus = clean(maritalStatus);
     const _motherTongue = clean(motherTongue);
     const _gotra = clean(gotra);
+    const _rashi = clean(rashi);
+    const _nakshatra = clean(nakshatra);
     const _subCaste = clean(subCaste);
     const _guruMatha = clean(guruMatha);
     const _currentCityOfResidence = clean(currentCityOfResidence);
     const _income = clean(income);
-    const _traditionalValues = clean(traditionalValues);
+    const _education = clean(education);
+    const _profession = clean(profession);
+    const _traditionalValues =
+      clean(traditionalValues);
     const _currentLocationCountry = clean(currentLocationCountry);
     const _currentLocationState = clean(currentLocationState);
     const _myProfileFor = clean(myProfileFor);
@@ -118,6 +127,8 @@ const searchProfiles = async (
       maritalStatus: _maritalStatus,
       motherTongue: _motherTongue,
       gotra: _gotra,
+      rashi: _rashi,
+      nakshatra: _nakshatra,
       subCaste: _subCaste,
       guruMatha: _guruMatha,
       currentCityOfResidence: _currentCityOfResidence,
@@ -130,9 +141,34 @@ const searchProfiles = async (
       eligibilityContext,
     });
 
-    let query = "SELECT * FROM profile WHERE 1=1";
-const values = [];
-let filterCount = 0;
+    let query = `
+      SELECT
+        profile_id,
+        name,
+        profile_for,
+        current_age,
+        height,
+        current_location,
+        current_city_of_residence,
+        current_location_state,
+        current_location_country,
+        gotra,
+        sub_caste,
+        mother_tongue,
+        married_status,
+        education,
+        profession,
+        income
+      FROM profile
+      WHERE 1=1
+        AND COALESCE(
+          share_details_on_platform,
+          'No'
+        ) = 'Yes'
+    `;
+
+    const values = [];
+    let filterCount = 0;
 
 const eligibilityResult = applyCandidateEligibility(
   query,
@@ -186,8 +222,20 @@ console.log(
     }
 
     if (_gotra) {
-      query += " AND gotra = ?";
+      query += " AND gotra != ?";
       values.push(_gotra);
+      filterCount++;
+    }
+
+    if (_rashi) {
+      query += " AND rashi = ?";
+      values.push(_rashi);
+      filterCount++;
+    }
+
+    if (_nakshatra) {
+      query += " AND nakshatra = ?";
+      values.push(_nakshatra);
       filterCount++;
     }
 
@@ -224,6 +272,18 @@ console.log(
     if (_income) {
       query += " AND income = ?";
       values.push(_income);
+      filterCount++;
+    }
+
+    if (_education) {
+      query += " AND education = ?";
+      values.push(_education);
+      filterCount++;
+    }
+
+    if (_profession) {
+      query += " AND profession = ?";
+      values.push(_profession);
       filterCount++;
     }
 

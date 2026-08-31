@@ -1,6 +1,7 @@
 // backend/src/controllers/advancedsearchController.js
 
 const AdvancedSearchModel = require("../models/AdvancedSearchModel");
+const ProfileSearchModel = require("../models/ProfileSearchModel");
 
 console.log("✅ AdvancedSearchController.js loaded");
 
@@ -18,10 +19,16 @@ const advancedSearchProfiles = async (req, res) => {
       maritalStatus,
       motherTongue,
       gotra,
+      rashi,
+      nakshatra,
       subCaste,
       guruMatha,
       currentCityOfResidence,
+      currentLocationCountry,
+      currentLocationState,
       income,
+      education,
+      profession,
       traditionalValues,
 
       heightMin,
@@ -39,40 +46,34 @@ const advancedSearchProfiles = async (req, res) => {
       observersRajamanta,
       observersChaturmasya,
 
-      // ✅ NEW (from UI)
       myProfileId,
-      myProfileFor: myProfileForFromBody,
     } = req.body || {};
 
-    console.log("🧾 ADV SEARCH myProfileId(from body):", myProfileId || "(EMPTY)");
-    console.log("🧾 ADV SEARCH myProfileFor(from body):", myProfileForFromBody || "(EMPTY)");
+    console.log(
+      "🧾 ADV SEARCH myProfileId(from body):",
+      myProfileId || "(EMPTY)"
+    );
 
-    // ✅ Determine applyOppositeByDefault based on UI selection
-    const uiProfileFor = String(profileFor || "").trim();
-    const applyOppositeByDefault = isBlank(uiProfileFor);
+    const uiProfileFor =
+      String(profileFor || "").trim();
 
-    console.log("🧾 ADV SEARCH profileFor(from UI):", uiProfileFor || "(EMPTY)");
-    console.log("🧾 ADV SEARCH applyOppositeByDefault:", applyOppositeByDefault);
-
-    // ✅ Resolve myProfileFor (server-side)
-    let myProfileFor = String(myProfileForFromBody || "").trim();
-
-    if (isBlank(myProfileFor) && !isBlank(myProfileId)) {
-      console.log("⚠️ ADV SEARCH myProfileFor missing -> fetching from DB using myProfileId...");
-      try {
-        const dbProfileFor = await AdvancedSearchModel.getProfileForByProfileId(myProfileId);
-        myProfileFor = String(dbProfileFor || "").trim();
-        console.log("🧾 ADV SEARCH myProfileFor(from DB):", myProfileFor || "(EMPTY)");
-      } catch (e) {
-        console.log("❌ ADV SEARCH DB lookup failed:", e?.message || e);
-      }
+    if (isBlank(myProfileId)) {
+      return res.status(400).json({
+        error:
+          "Logged-in profile ID is required for search.",
+      });
     }
 
-    console.log("🧾 ADV SEARCH myProfileFor(final):", myProfileFor || "(EMPTY)");
+    const eligibilityContext =
+      await ProfileSearchModel
+        .getCandidateEligibilityContext(
+          myProfileId
+        );
 
-    if (applyOppositeByDefault) {
-      console.log("✅ ADV SEARCH default-opposite requested. Expect SQL: AND profile_for != myProfileFor");
-    }
+    console.log(
+      "✅ ADV SEARCH candidate eligibility context loaded:",
+      eligibilityContext
+    );
 
     const profiles = await AdvancedSearchModel.searchProfiles(
       profileId || "",
@@ -82,10 +83,16 @@ const advancedSearchProfiles = async (req, res) => {
       maritalStatus || "",
       motherTongue || "",
       gotra || "",
+      rashi || "",
+      nakshatra || "",
       subCaste || "",
       guruMatha || "",
       currentCityOfResidence || "",
+      currentLocationCountry || "",
+      currentLocationState || "",
       income || "",
+      education || "",
+      profession || "",
       traditionalValues || "",
 
       heightMin || "",
@@ -103,9 +110,7 @@ const advancedSearchProfiles = async (req, res) => {
       observersRajamanta || "",
       observersChaturmasya || "",
 
-      // ✅ NEW (end args)
-      myProfileFor || "",
-      applyOppositeByDefault
+      eligibilityContext
     );
 
     console.log(`✅ ADV SEARCH results count: ${profiles.length}`);

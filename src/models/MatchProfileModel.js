@@ -62,6 +62,10 @@ const findMatchingProfiles = async (preferredCriteria, loggedInUserProfileId, db
       FROM profile
       WHERE profile_id != ?
         AND profile_for != ?
+        AND COALESCE(
+          share_details_on_platform,
+          'No'
+        ) = 'Yes'
     `;
     const values = [loggedInUserProfileId, preferredCriteria.preferredProfileFor];
 

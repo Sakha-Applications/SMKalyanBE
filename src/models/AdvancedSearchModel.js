@@ -1,5 +1,8 @@
 // backend/src/models/AdvancedSearchModel.js
 const pool = require("../config/db");
+const {
+  applyCandidateEligibility,
+} = require("./candidateEligibility");
 
 // Debug helper: log SQL + params + expanded query (for troubleshooting only)
 const logSql = (label, sql, params) => {
@@ -48,17 +51,6 @@ const parseHeightToInches = (heightStr) => {
   return null;
 };
 
-// ✅ NEW: fetch logged-in user's profile_for using profile_id
-const getProfileForByProfileId = async (profileId) => {
-  const pid = String(profileId || "").trim();
-  if (!pid) return "";
-
-  const sql = "SELECT profile_for FROM profile WHERE profile_id = ? LIMIT 1";
-  console.log("🧾 ADV MODEL getProfileForByProfileId SQL:", sql, "PARAM:", [pid]);
-
-  const [rows] = await pool.execute(sql, [pid]);
-  return rows?.[0]?.profile_for || "";
-};
 
 const searchProfiles = async (
   profileId,
@@ -68,10 +60,16 @@ const searchProfiles = async (
   maritalStatus,
   motherTongue,
   gotra,
+  rashi,
+  nakshatra,
   subCaste,
   guruMatha,
   currentCityOfResidence,
+  currentLocationCountry,
+  currentLocationState,
   income,
+  education,
+  profession,
   traditionalValues,
 
   heightMin,
@@ -89,9 +87,7 @@ const searchProfiles = async (
   observersRajamanta,
   observersChaturmasya,
 
-  // ✅ NEW
-  myProfileFor,
-  applyOppositeByDefault
+  eligibilityContext
 ) => {
   try {
     const clean = (v) => (v === undefined || v === null ? "" : String(v).trim());
@@ -103,11 +99,18 @@ const searchProfiles = async (
     const _maritalStatus = clean(maritalStatus);
     const _motherTongue = clean(motherTongue);
     const _gotra = clean(gotra);
+    const _rashi = clean(rashi);
+    const _nakshatra = clean(nakshatra);
     const _subCaste = clean(subCaste);
     const _guruMatha = clean(guruMatha);
     const _currentCityOfResidence = clean(currentCityOfResidence);
+    const _currentLocationCountry = clean(currentLocationCountry);
+    const _currentLocationState = clean(currentLocationState);
     const _income = clean(income);
-    const _traditionalValues = clean(traditionalValues);
+    const _education = clean(education);
+    const _profession = clean(profession);
+    const _traditionalValues =
+      clean(traditionalValues);
 
     const _heightMin = clean(heightMin);
     const _heightMax = clean(heightMax);
@@ -124,19 +127,18 @@ const searchProfiles = async (
     const _observersRajamanta = clean(observersRajamanta);
     const _observersChaturmasya = clean(observersChaturmasya);
 
-    const _myProfileFor = clean(myProfileFor);
-    const _applyOppositeByDefault = !!applyOppositeByDefault;
 
     console.log("\n🧾 ADV MODEL searchProfiles inputs:", {
       profileId: _profileId,
       profileFor: _profileFor,
-      myProfileFor: _myProfileFor,
-      applyOppositeByDefault: _applyOppositeByDefault,
+      eligibilityContext,
       minAge: _minAge,
       maxAge: _maxAge,
       maritalStatus: _maritalStatus,
       motherTongue: _motherTongue,
       gotra: _gotra,
+      rashi: _rashi,
+      nakshatra: _nakshatra,
       subCaste: _subCaste,
       guruMatha: _guruMatha,
       currentCityOfResidence: _currentCityOfResidence,
@@ -146,22 +148,47 @@ const searchProfiles = async (
       heightMax: _heightMax,
     });
 
-    let query = `SELECT * FROM profile WHERE 1=1`;
+    let query = `
+      SELECT
+        profile_id,
+        name,
+        profile_for,
+        current_age,
+        height,
+        current_location,
+        current_city_of_residence,
+        current_location_state,
+        current_location_country,
+        gotra,
+        sub_caste,
+        mother_tongue,
+        married_status,
+        education,
+        profession,
+        income
+      FROM profile
+      WHERE 1=1
+        AND COALESCE(
+          share_details_on_platform,
+          'No'
+        ) = 'Yes'
+    `;
+
     const values = [];
     let filterCount = 0;
 
-    // ✅ REQUIRED DEFAULT (same as Basic Search):
-    // if UI doesn't send profileFor -> enforce profile_for != myProfileFor
-    if (_applyOppositeByDefault) {
-      if (!isBlank(_myProfileFor)) {
-        query += ` AND profile_for != ?`;
-        values.push(_myProfileFor);
-        filterCount++;
-        console.log("✅ ADV MODEL applied default filter: profile_for != myProfileFor");
-      } else {
-        console.log("⚠️ ADV MODEL applyOppositeByDefault TRUE but myProfileFor EMPTY -> cannot apply default filter");
-      }
-    }
+    const eligibilityResult =
+      applyCandidateEligibility(
+        query,
+        values,
+        eligibilityContext
+      );
+
+    query = eligibilityResult.query;
+
+    console.log(
+      "✅ ADVANCED SEARCH global candidate eligibility applied"
+    );
 
     if (_profileId) {
       query += ` AND profile_id LIKE ?`;
@@ -202,8 +229,20 @@ const searchProfiles = async (
     }
 
     if (_gotra) {
-      query += ` AND gotra != ?`; // kept as your original behavior
+      query += ` AND gotra != ?`;
       values.push(_gotra);
+      filterCount++;
+    }
+
+    if (_rashi) {
+      query += ` AND rashi = ?`;
+      values.push(_rashi);
+      filterCount++;
+    }
+
+    if (_nakshatra) {
+      query += ` AND nakshatra = ?`;
+      values.push(_nakshatra);
       filterCount++;
     }
 
@@ -220,19 +259,42 @@ const searchProfiles = async (
     }
 
     if (_currentCityOfResidence) {
-      query += ` AND current_location = ?`; // kept as your original behavior
+      query += ` AND current_city_of_residence = ?`;
       values.push(_currentCityOfResidence);
+      filterCount++;
+    }
+    if (_currentLocationCountry) {
+      query += ` AND current_location_country = ?`;
+      values.push(_currentLocationCountry);
+      filterCount++;
+    }
+
+    if (_currentLocationState) {
+      query += ` AND current_location_state = ?`;
+      values.push(_currentLocationState);
       filterCount++;
     }
 
     if (_income) {
-      query += ` AND annual_income = ?`;
+      query += ` AND income = ?`;
       values.push(_income);
       filterCount++;
     }
 
+    if (_education) {
+      query += ` AND education = ?`;
+      values.push(_education);
+      filterCount++;
+    }
+
+    if (_profession) {
+      query += ` AND profession = ?`;
+      values.push(_profession);
+      filterCount++;
+    }
+
     if (_traditionalValues) {
-      query += ` AND family_values = ?`;
+      query += ` AND traditional_values = ?`;
       values.push(_traditionalValues);
       filterCount++;
     }
@@ -339,4 +401,6 @@ const searchProfiles = async (
   }
 };
 
-module.exports = { searchProfiles, getProfileForByProfileId };
+module.exports = {
+  searchProfiles,
+};

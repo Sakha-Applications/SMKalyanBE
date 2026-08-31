@@ -4,7 +4,10 @@ console.log("✅ contactDetailsModel.js loaded");
 const findContactDetails = async ({ profileId, profileFor, minAge, maxAge, gotra }) => {
     try {
         let query = `
-            SELECT *
+            SELECT
+                profile_id,
+                name,
+                phone
             FROM profile
             WHERE 1=1
         `;

@@ -41,6 +41,16 @@ const advertisementResponseRoutes =
     "./routes/advertisementResponseRoutes"
   );
 
+const consultationFollowupRoutes =
+  require(
+    "./routes/consultationFollowupRoutes"
+  );
+
+const creditRoutes =
+  require(
+    "./routes/creditRoutes"
+  );
+
 const profileForwardRoutes =
   require(
     "./routes/profileForwardRoutes"
@@ -120,6 +130,14 @@ app.use('/api/preferred-profiles', preferredProfileRoutes);
 app.use(
   "/api/advertisement-responses",
   advertisementResponseRoutes
+);
+app.use(
+  "/api",
+  consultationFollowupRoutes
+);
+app.use(
+  "/api/credits",
+  creditRoutes
 );
 
 app.use(

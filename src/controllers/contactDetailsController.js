@@ -10,6 +10,9 @@ const adminSettingsModel =
 const AdvertisementResponseModel =
     require("../models/advertisementResponseModel");
 
+const creditModel =
+    require("../models/creditModel");
+
 const {
     sendEmailReport
 } = require("../services/emailService");
@@ -153,7 +156,12 @@ const getContactDetails = async (
             });
         }
 
-        return res.json(results[0]);
+        return res.status(200).json({
+            success: true,
+            status: "APPROVED",
+            contact:
+                results[0]
+        });
 
     } catch (error) {
         console.error(
@@ -246,6 +254,137 @@ const shareContactDetails = async (
             }
         }
 
+        const normalizedRequestSource =
+            String(
+                requestSource || ""
+            )
+                .trim()
+                .toUpperCase();
+
+        if (
+            normalizedRequestSource ===
+            "ADVERTISEMENT_MUTUAL"
+        ) {
+            /*
+             * If this phone was already unlocked
+             * earlier, return it without charging
+             * the member again.
+             */
+            const existingShare =
+                await contactDetailsModel
+                    .findExistingShare(
+                        authProfile.profileId,
+                        sharedProfileId
+                    );
+
+            if (existingShare) {
+                const details =
+                    await contactDetailsModel
+                        .findContactDetails({
+                            profileId:
+                                sharedProfileId
+                        });
+
+                return res.status(200).json({
+                    success: true,
+                    status: "APPROVED",
+                    alreadyUnlocked: true,
+                    contact:
+                        details?.[0] || null
+                });
+            }
+
+            const configuration =
+                await creditModel
+                    .getCreditConfiguration();
+
+            const contactViewCost =
+                Number(
+                    configuration
+                        .contactViewCost || 0
+                );
+
+            const creditResult =
+                await creditModel
+                    .debitCredits({
+                        profileId:
+                            authProfile.profileId,
+
+                        transactionType:
+                            "CONTACT_VIEW",
+
+                        referenceType:
+                            "PROFILE_CONTACT",
+
+                        referenceId:
+                            sharedProfileId,
+
+                        credits:
+                            contactViewCost,
+
+                        description:
+                            `Phone number unlocked for profile ${sharedProfileId}`
+                    });
+
+            await contactDetailsModel
+                .recordShare({
+                    shared_with_profile_id:
+                        authProfile.profileId,
+
+                    shared_with_email:
+                        authProfile.email,
+
+                    shared_profile_id:
+                        sharedProfileId,
+
+                    shared_profile_name:
+                        sharedProfileName || "",
+
+                    shared_at:
+                        new Date()
+                });
+
+            const details =
+                await contactDetailsModel
+                    .findContactDetails({
+                        profileId:
+                            sharedProfileId
+                    });
+
+            return res.status(200).json({
+                success: true,
+                status: "APPROVED",
+
+                alreadyUnlocked:
+                    false,
+
+                contact:
+                    details?.[0] || null,
+
+                credit: {
+                    cost:
+                        contactViewCost,
+
+                    debited:
+                        creditResult.debited,
+
+                    balanceBefore:
+                        creditResult.balanceBefore,
+
+                    balanceAfter:
+                        creditResult.balanceAfter,
+
+                    lowCredit:
+                        creditResult.balanceAfter <=
+                        configuration
+                            .lowCreditThreshold,
+
+                    lowCreditThreshold:
+                        configuration
+                            .lowCreditThreshold
+                }
+            });
+        }
         /*
          * Already approved earlier:
          * return contact immediately without consuming
@@ -372,10 +511,33 @@ const shareContactDetails = async (
             error
         );
 
+        if (
+            error.code ===
+            "INSUFFICIENT_CREDITS"
+        ) {
+            return res.status(402).json({
+                success: false,
+
+                code:
+                    "INSUFFICIENT_CREDITS",
+
+                message:
+                    error.message,
+
+                data: {
+                    requiredCredits:
+                        error.requiredCredits,
+
+                    availableBalance:
+                        error.availableBalance
+                }
+            });
+        }
+
         return res.status(500).json({
             success: false,
             message:
-                "Failed to submit contact request.",
+                "Failed to unlock the phone number.",
             error: error.message
         });
     }

@@ -19,8 +19,63 @@ class PreferredProfileModel {
         payment_reference,
         payment_date,
         payment_time,
-        member_narrative = null
+        member_narrative = null,
+        advertiser_convenient_time = null
       } = profileData;
+
+      /*
+       * Derive advertisement looking_for from the
+       * member's authoritative profile type.
+       *
+       * Bride       -> looking for BRIDEGROOM
+       * Bridegroom  -> looking for BRIDE
+       */
+      const [profileRows] =
+        await db.execute(
+          `
+            SELECT profile_for
+            FROM profile
+            WHERE profile_id = ?
+            LIMIT 1
+          `,
+          [profile_id]
+        );
+
+      if (
+        profileRows.length === 0
+      ) {
+        throw new Error(
+          'Profile not found while creating advertisement'
+        );
+      }
+
+      const profileFor =
+        String(
+          profileRows[0]
+            .profile_for || ''
+        )
+          .trim()
+          .toUpperCase();
+
+      let lookingFor;
+
+      if (
+        profileFor === 'BRIDE'
+      ) {
+        lookingFor =
+          'BRIDEGROOM';
+      } else if (
+        profileFor ===
+          'BRIDEGROOM' ||
+        profileFor === 'GROOM'
+      ) {
+        lookingFor =
+          'BRIDE';
+      } else {
+        throw new Error(
+          'Unable to determine advertisement looking_for from profile'
+        );
+      }
 
       // Calculate validity date (payment_date + 90 days)
       const validityDate = new Date(payment_date);
@@ -92,6 +147,7 @@ class PreferredProfileModel {
           email,
           phone_number,
           member_name,
+          looking_for,
           payment_amount,
           payment_method,
           payment_reference,
@@ -99,6 +155,7 @@ class PreferredProfileModel {
           payment_time,
           validity_date,
           member_narrative,
+          advertiser_convenient_time,
           payment_status,
           review_status,
           moderator_narrative,
@@ -106,7 +163,7 @@ class PreferredProfileModel {
           status
         )
         VALUES (
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           'PENDING',
           'PENDING',
           NULL,
@@ -120,13 +177,15 @@ class PreferredProfileModel {
         email,
         phone_number,
         member_name,
+        lookingFor,
         payment_amount,
         payment_method,
         payment_reference,
         payment_date,
         payment_time,
         validity_date,
-        member_narrative
+        member_narrative,
+        advertiser_convenient_time
       ];
 
       const [result] = await db.execute(query, values);
@@ -152,10 +211,11 @@ class PreferredProfileModel {
     try {
       const query = `
         SELECT
-          id, profile_id, email, phone_number, member_name, payment_amount,
+          id, profile_id, email, phone_number, member_name, looking_for, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date,
           member_narrative,
+          advertiser_convenient_time,
           payment_status,
           review_status,
           moderator_narrative,
@@ -193,7 +253,7 @@ class PreferredProfileModel {
     try {
       const query = `
         SELECT
-          id, profile_id, email, phone_number, member_name, payment_amount,
+          id, profile_id, email, phone_number, member_name, looking_for, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date,
           member_narrative,
@@ -230,7 +290,7 @@ class PreferredProfileModel {
 
       const query = `
         SELECT
-          id, profile_id, email, phone_number, member_name, payment_amount,
+          id, profile_id, email, phone_number, member_name, looking_for, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date,
           member_narrative,
@@ -283,6 +343,7 @@ class PreferredProfileModel {
           pp.payment_time,
 
           pp.member_narrative,
+          pp.advertiser_convenient_time,
           pp.moderator_narrative,
           pp.moderator_remarks,
 
@@ -421,7 +482,8 @@ class PreferredProfileModel {
   static async updateMemberAdvertisement({
     advertisementId,
     profileId,
-    advertisementText
+    advertisementText,
+    advertiserConvenientTime
   }) {
     try {
       const [rows] =
@@ -477,6 +539,7 @@ class PreferredProfileModel {
             UPDATE preferred_profiles
             SET
               member_narrative = ?,
+              advertiser_convenient_time = ?,
               review_status = 'PENDING',
               moderator_remarks = NULL,
               updated_at = CURRENT_TIMESTAMP
@@ -485,6 +548,7 @@ class PreferredProfileModel {
           `,
           [
             advertisementText,
+            advertiserConvenientTime || null,
             advertisementId,
             profileId
           ]
@@ -505,6 +569,7 @@ class PreferredProfileModel {
             UPDATE preferred_profiles
             SET
               member_narrative = ?,
+              advertiser_convenient_time = ?,
               moderator_narrative = NULL,
               moderator_remarks = NULL,
               review_status = 'PENDING',
@@ -516,6 +581,7 @@ class PreferredProfileModel {
           `,
           [
             advertisementText,
+            advertiserConvenientTime || null,
             advertisementId,
             profileId
           ]
@@ -539,6 +605,7 @@ class PreferredProfileModel {
           UPDATE preferred_profiles
           SET
             member_narrative = ?,
+            advertiser_convenient_time = ?,
             moderator_remarks = NULL,
             review_status =
               CASE
@@ -552,6 +619,7 @@ class PreferredProfileModel {
         `,
         [
           advertisementText,
+          advertiserConvenientTime || null,
           advertisementId,
           profileId
         ]
@@ -579,7 +647,7 @@ class PreferredProfileModel {
     try {
       const query = `
         SELECT
-          id, profile_id, email, phone_number, member_name, payment_amount,
+          id, profile_id, email, phone_number, member_name, looking_for, payment_amount,
           payment_method, payment_reference, payment_date, payment_time,
           validity_date,
           member_narrative,
@@ -822,7 +890,7 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
           NULLIF(
             pp.moderator_narrative,
             ''
-          ) AS transaction_details,
+          ) AS approved_advertisement_text,
 
           DATEDIFF(
             pp.validity_date,
@@ -896,7 +964,7 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
           NULLIF(
             pp.moderator_narrative,
             ''
-          ) AS transaction_details,
+          ) AS approved_advertisement_text,
           pp.payment_amount,
           pp.validity_date,
           DATEDIFF(pp.validity_date, CURDATE()) as days_remaining,
@@ -939,10 +1007,10 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
       // Keep the complete approved advertisement narrative.
       // Do not truncate the advertisement in the API.
       display_summary:
-        row.transaction_details &&
-        row.transaction_details.trim()
-          ? row.transaction_details
-          : `${row.name || row.member_name || 'Profile'} is a preferred member looking for a life partner.`,
+        row.approved_advertisement_text &&
+        row.approved_advertisement_text.trim()
+          ? row.approved_advertisement_text
+          : `${row.name || row.member_name || "Profile"} is a preferred member looking for a life partner.`,
 
       // Ensure proper date formatting
       display_date: row.updated_at ? new Date(row.updated_at).toLocaleDateString() : null,

@@ -90,7 +90,8 @@ class PreferredProfileController {
         payment_reference,
         payment_date,
         payment_time,
-        member_narrative
+        member_narrative,
+        advertiser_convenient_time
       } = req.body;
 
       // Required-field validation.
@@ -176,7 +177,21 @@ class PreferredProfileController {
         String(
           member_narrative || ""
         ).trim();
+      const normalizedAdvertiserConvenientTime =
+        String(
+          advertiser_convenient_time || ""
+        ).trim();
 
+      if (
+        normalizedAdvertiserConvenientTime.length >
+        255
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Convenient time cannot exceed 255 characters."
+        });
+      }
       if (!normalizedMemberNarrative) {
         return res.status(400).json({
           success: false,
@@ -222,7 +237,11 @@ class PreferredProfileController {
                 .split(' ')[0],
 
             member_narrative:
-              normalizedMemberNarrative
+              normalizedMemberNarrative,
+
+            advertiser_convenient_time:
+              normalizedAdvertiserConvenientTime ||
+              null
           });
 
       console.log('[PreferredProfileController] Successfully created preferred profile:', createdRecord.profile_id);
@@ -334,6 +353,13 @@ class PreferredProfileController {
           ""
         ).trim();
 
+      const advertiserConvenientTime =
+        String(
+          req.body
+            ?.advertiserConvenientTime ||
+          ""
+        ).trim();
+
       if (!profileId) {
         return res.status(400).json({
           success: false,
@@ -373,13 +399,23 @@ class PreferredProfileController {
             `Advertisement text cannot exceed ${ADVERTISEMENT_MAX_LENGTH} characters.`
         });
       }
-
+      if (
+        advertiserConvenientTime.length >
+        255
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Convenient time cannot exceed 255 characters."
+        });
+      }
       const updated =
         await PreferredProfileModel
           .updateMemberAdvertisement({
             advertisementId,
             profileId,
-            advertisementText
+            advertisementText,
+            advertiserConvenientTime
           });
 
       if (!updated) {

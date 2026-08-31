@@ -16,6 +16,9 @@ const PreferredProfileModel =
 const adminSettingsModel =
     require('../models/adminSettingsModel');
 
+const creditModel =
+    require('../models/creditModel');
+
 // Handle submission of offline payment details
 const submitOfflinePayment = async (req, res) => {
     try {
@@ -333,12 +336,47 @@ const updateOfflinePaymentStatus = async (req, res) => {
                 const profile_id =
                     paymentRow.profile_id;
 
+                /*
+                 * Add credits from the actual
+                 * verified payment amount.
+                 *
+                 * Example:
+                 * ₹1000 = 1000 configured credits
+                 * ₹500  = 500 credits
+                 *
+                 * creditRecharge is idempotent,
+                 * so the same payment cannot be
+                 * credited twice.
+                 */
+                const creditResult =
+                    await creditModel
+                        .creditRecharge({
+                            profileId:
+                                profile_id,
+
+                            paymentId:
+                                paymentRow.id,
+
+                            approvedPaymentAmount:
+                                paymentRow.amount
+                        });
+
+                /*
+                 * Temporary compatibility:
+                 * keep the legacy contact-view
+                 * reset until View Phone is fully
+                 * migrated to the credit engine.
+                 *
+                 * We will remove this call when
+                 * CONTACT_VIEW_CREDIT_COST becomes
+                 * authoritative.
+                 */
                 await resetSharedContactsForProfile(
                     profile_id
                 );
 
                 console.log(
-                    `✅ Shared contact views reset after verified renewal for profile_id=${profile_id}`
+                    `✅ Recharge verified for profile_id=${profile_id}. Credits added=${creditResult.creditsAdded}, balance=${creditResult.balance}`
                 );
             }
 

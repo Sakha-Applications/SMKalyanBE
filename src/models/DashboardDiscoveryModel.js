@@ -88,6 +88,10 @@ const getDiscoveryCount = async (
     SELECT COUNT(*) AS profileCount
     FROM profile
     WHERE 1=1
+      AND COALESCE(
+        share_details_on_platform,
+        'No'
+      ) = 'Yes'
   `;
 
   const values = [];
@@ -232,6 +236,10 @@ const getDiscoveryProfiles = async (
       created_at
     FROM profile
     WHERE 1=1
+      AND COALESCE(
+        share_details_on_platform,
+        'No'
+      ) = 'Yes'
   `;
 
   const values = [];
@@ -380,6 +388,10 @@ const getDiscoverySummary = async (profileId) => {
 
     FROM profile
     WHERE 1=1
+      AND COALESCE(
+        share_details_on_platform,
+        'No'
+      ) = 'Yes'
   `;
 
   const values = [
