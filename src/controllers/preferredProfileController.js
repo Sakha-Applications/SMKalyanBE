@@ -4,6 +4,9 @@ const PreferredProfileModel =
 const adminSettingsModel =
   require('../models/adminSettingsModel');
 
+const MemberNotificationModel =
+  require('../models/memberNotificationModel');
+
 const ADVERTISEMENT_MAX_LENGTH = 1000;
 
 class PreferredProfileController {
@@ -650,6 +653,105 @@ class PreferredProfileController {
   }
 
   /**
+   * Browse active advertisements for authenticated
+   * members with server-side filters and pagination.
+   * GET /api/preferred-profiles/browse
+   */
+  static async browseAdvertisements(
+    req,
+    res
+  ) {
+    try {
+      const page =
+        parseInt(
+          req.query.page,
+          10
+        ) || 1;
+
+      const limit =
+        parseInt(
+          req.query.limit,
+          10
+        ) || 6;
+
+      if (
+        page < 1 ||
+        limit < 1 ||
+        limit > 24
+      ) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              "Invalid pagination. Page must be at least 1 and limit must be between 1 and 24."
+          });
+      }
+
+      const result =
+        await PreferredProfileModel
+          .browseAdvertisements({
+            page,
+            limit,
+            lookingFor:
+              req.query
+                .lookingFor ||
+              "",
+            minAge:
+              req.query.minAge ||
+              null,
+            maxAge:
+              req.query.maxAge ||
+              null,
+            location:
+              req.query.location ||
+              "",
+            qualification:
+              req.query
+                .qualification ||
+              "",
+            profession:
+              req.query.profession ||
+              "",
+            excludeGotra:
+              req.query
+                .excludeGotra ||
+              ""
+          });
+
+      return res
+        .status(200)
+        .json({
+          success: true,
+          data:
+            result
+              .advertisements,
+          meta:
+            result.meta
+        });
+    } catch (error) {
+      console.error(
+        "[PreferredProfileController] Error browsing advertisements:",
+        error
+      );
+
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message:
+            "Internal server error while browsing advertisements",
+          error:
+            process.env
+              .NODE_ENV ===
+            "development"
+              ? error.message
+              : undefined
+        });
+    }
+  }
+
+  /**
    * NEW: Get preferred profiles for frontend display (Home/Dashboard)
    * GET /api/preferred-profiles/display
    */
@@ -994,6 +1096,58 @@ class PreferredProfileController {
           message:
             "Advertisement not found"
         });
+      }
+
+      if (normalizedAction === "REJECT") {
+        try {
+          const remainsPublished =
+            String(
+              advertisement.status || ""
+            )
+              .trim()
+              .toLowerCase() === "active";
+
+          await MemberNotificationModel
+            .createNotification({
+              profileId:
+                advertisement.profile_id,
+              notificationType:
+                remainsPublished
+                  ? "ADVERTISEMENT_REVISION_REJECTED"
+                  : "ADVERTISEMENT_REJECTED",
+              category:
+                "ADMIN",
+              title:
+                remainsPublished
+                  ? "Advertisement Revision Rejected"
+                  : "Advertisement Rejected",
+              message:
+                String(
+                  moderatorRemarks ||
+                  (
+                    remainsPublished
+                      ? "The requested advertisement revision was not approved. Your previously published advertisement remains active."
+                      : "The advertisement was not approved. Please review the moderator remarks before resubmitting."
+                  )
+                ).trim(),
+              referenceType:
+                "ADVERTISEMENT",
+              referenceId:
+                String(
+                  advertisement.id ||
+                  advertisementId
+                ),
+              priority:
+                100,
+              createdBy:
+                reviewedBy
+            });
+        } catch (notificationError) {
+          console.error(
+            "[PreferredProfileController] Advertisement rejection saved, but member notification could not be created:",
+            notificationError.message
+          );
+        }
       }
 
       return res.status(200).json({

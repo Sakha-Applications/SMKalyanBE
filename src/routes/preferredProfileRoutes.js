@@ -29,6 +29,11 @@ router.post('/', requireAuth, requireApprovedProfile, PreferredProfileController
 router.get('/active', PreferredProfileController.getActivePreferredProfiles);
 router.get('/ticker', PreferredProfileController.getPreferredProfilesForTicker);
 router.get('/display', PreferredProfileController.getPreferredProfilesForDisplay);
+router.get(
+  '/browse',
+  requireAuth,
+  PreferredProfileController.browseAdvertisements
+);
 router.get('/check/:profileId', PreferredProfileController.checkIfProfilePreferred);
 
 /**

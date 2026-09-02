@@ -164,169 +164,250 @@ const updateAdminSettings = async (req, res) => {
   try {
     const body = req.body || {};
     const payload = {};
+    const KEYS =
+      adminSettingsModel.KEYS;
 
-    // Only accept known configurable keys.
-    const KEYS = adminSettingsModel.KEYS;
+    const allowedKeys = [
+      KEYS.REGISTRATION_FEE_AMOUNT,
+      KEYS.CONTACT_VIEWS_PER_CYCLE,
+      KEYS.RECHARGE_FEE_AMOUNT,
+      KEYS.RECHARGE_CREDIT_POINTS,
+      KEYS.LOW_CREDIT_REMINDER_THRESHOLD,
+      KEYS.SHOW_INTEREST_CREDIT_COST,
+      KEYS.SHORTLIST_CREDIT_COST,
+      KEYS.DIRECT_APPLY_CREDIT_COST,
+      KEYS.MUTUAL_INTEREST_CREDIT_COST,
+      KEYS.CONTACT_VIEW_CREDIT_COST,
+      KEYS.ADVERTISEMENT_MIN_CONTRIBUTION
+    ];
 
-    if (body[KEYS.REGISTRATION_FEE_AMOUNT] !== undefined) {
-      payload[KEYS.REGISTRATION_FEE_AMOUNT] =
-        body[KEYS.REGISTRATION_FEE_AMOUNT];
-    }
-
-    if (body[KEYS.CONTACT_VIEWS_PER_CYCLE] !== undefined) {
-      payload[KEYS.CONTACT_VIEWS_PER_CYCLE] =
-        body[KEYS.CONTACT_VIEWS_PER_CYCLE];
-    }
-
-    if (body[KEYS.RECHARGE_FEE_AMOUNT] !== undefined) {
-      payload[KEYS.RECHARGE_FEE_AMOUNT] =
-        body[KEYS.RECHARGE_FEE_AMOUNT];
-    }
-
-    if (body[KEYS.ADVERTISEMENT_MIN_CONTRIBUTION] !== undefined) {
-      payload[KEYS.ADVERTISEMENT_MIN_CONTRIBUTION] =
-        body[KEYS.ADVERTISEMENT_MIN_CONTRIBUTION];
-    }
+    allowedKeys.forEach((key) => {
+      if (
+        key &&
+        body[key] !== undefined
+      ) {
+        payload[key] =
+          body[key];
+      }
+    });
 
     const hasValue = (value) =>
       value !== undefined &&
       value !== null &&
       String(value).trim() !== "";
 
-    const toNum = (value) => {
+    const toNumber = (value) => {
       if (!hasValue(value)) {
         return null;
       }
 
-      const number = Number(value);
-      return Number.isFinite(number) ? number : null;
+      const number =
+        Number(value);
+
+      return Number.isFinite(
+        number
+      )
+        ? number
+        : null;
     };
 
-    // --------------------------------------------------------
-    // Registration fee
-    // --------------------------------------------------------
+    const moneyKeys = [
+      KEYS.REGISTRATION_FEE_AMOUNT,
+      KEYS.RECHARGE_FEE_AMOUNT,
+      KEYS.ADVERTISEMENT_MIN_CONTRIBUTION
+    ];
 
-    if (payload[KEYS.REGISTRATION_FEE_AMOUNT] !== undefined) {
-      const regAmt = toNum(
-        payload[KEYS.REGISTRATION_FEE_AMOUNT]
-      );
-
-      if (regAmt === null || regAmt < 0) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "REGISTRATION_FEE_AMOUNT must be a number greater than or equal to 0"
-        });
+    for (const key of moneyKeys) {
+      if (
+        payload[key] ===
+        undefined
+      ) {
+        continue;
       }
 
-      payload[KEYS.REGISTRATION_FEE_AMOUNT] =
-        String(regAmt);
-    }
-
-    // --------------------------------------------------------
-    // Contact views per cycle
-    // --------------------------------------------------------
-
-    if (payload[KEYS.CONTACT_VIEWS_PER_CYCLE] !== undefined) {
-      const views = toNum(
-        payload[KEYS.CONTACT_VIEWS_PER_CYCLE]
-      );
+      const value =
+        toNumber(
+          payload[key]
+        );
 
       if (
-        views === null ||
-        !Number.isInteger(views) ||
-        views <= 0
+        value === null ||
+        value < 0
       ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "CONTACT_VIEWS_PER_CYCLE must be a positive integer"
-        });
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              `${key} must be a number greater than or equal to 0`
+          });
       }
 
-      payload[KEYS.CONTACT_VIEWS_PER_CYCLE] =
-        String(views);
+      payload[key] =
+        String(value);
     }
-
-    // --------------------------------------------------------
-    // Recharge fee
-    // --------------------------------------------------------
-
-    if (payload[KEYS.RECHARGE_FEE_AMOUNT] !== undefined) {
-      const rechargeAmt = toNum(
-        payload[KEYS.RECHARGE_FEE_AMOUNT]
-      );
-
-      if (rechargeAmt === null || rechargeAmt < 0) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "RECHARGE_FEE_AMOUNT must be a number greater than or equal to 0"
-        });
-      }
-
-      payload[KEYS.RECHARGE_FEE_AMOUNT] =
-        String(rechargeAmt);
-    }
-
-    // --------------------------------------------------------
-    // Minimum advertisement contribution
-    // --------------------------------------------------------
 
     if (
-      payload[KEYS.ADVERTISEMENT_MIN_CONTRIBUTION] !==
-      undefined
+      payload[
+        KEYS.RECHARGE_CREDIT_POINTS
+      ] !== undefined
     ) {
-      const advertisementMin = toNum(
-        payload[
-          KEYS.ADVERTISEMENT_MIN_CONTRIBUTION
-        ]
-      );
+      const value =
+        toNumber(
+          payload[
+            KEYS.RECHARGE_CREDIT_POINTS
+          ]
+        );
 
       if (
-        advertisementMin === null ||
-        advertisementMin < 0
+        value === null ||
+        !Number.isInteger(
+          value
+        ) ||
+        value <= 0
       ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "ADVERTISEMENT_MIN_CONTRIBUTION must be a number greater than or equal to 0"
-        });
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              "RECHARGE_CREDIT_POINTS must be a positive integer"
+          });
       }
 
       payload[
-        KEYS.ADVERTISEMENT_MIN_CONTRIBUTION
-      ] = String(advertisementMin);
+        KEYS.RECHARGE_CREDIT_POINTS
+      ] = String(value);
     }
 
-    // Nothing supplied.
-    if (Object.keys(payload).length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No valid admin settings supplied"
-      });
+    const nonNegativeCreditKeys = [
+      KEYS.LOW_CREDIT_REMINDER_THRESHOLD,
+      KEYS.SHOW_INTEREST_CREDIT_COST,
+      KEYS.SHORTLIST_CREDIT_COST,
+      KEYS.DIRECT_APPLY_CREDIT_COST,
+      KEYS.MUTUAL_INTEREST_CREDIT_COST,
+      KEYS.CONTACT_VIEW_CREDIT_COST
+    ];
+
+    for (
+      const key of
+      nonNegativeCreditKeys
+    ) {
+      if (
+        payload[key] ===
+        undefined
+      ) {
+        continue;
+      }
+
+      const value =
+        toNumber(
+          payload[key]
+        );
+
+      if (
+        value === null ||
+        !Number.isInteger(
+          value
+        ) ||
+        value < 0
+      ) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              `${key} must be a non-negative integer`
+          });
+      }
+
+      payload[key] =
+        String(value);
+    }
+
+    /*
+     * Retained only for backward compatibility.
+     * The active member journey uses credit
+     * deductions rather than a cycle counter.
+     */
+    if (
+      payload[
+        KEYS.CONTACT_VIEWS_PER_CYCLE
+      ] !== undefined
+    ) {
+      const value =
+        toNumber(
+          payload[
+            KEYS.CONTACT_VIEWS_PER_CYCLE
+          ]
+        );
+
+      if (
+        value === null ||
+        !Number.isInteger(
+          value
+        ) ||
+        value <= 0
+      ) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message:
+              "CONTACT_VIEWS_PER_CYCLE must be a positive integer"
+          });
+      }
+
+      payload[
+        KEYS.CONTACT_VIEWS_PER_CYCLE
+      ] = String(value);
+    }
+
+    if (
+      Object.keys(payload)
+        .length === 0
+    ) {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message:
+            "No valid admin settings supplied"
+        });
     }
 
     const result =
-      await adminSettingsModel.upsertSettings(payload);
+      await adminSettingsModel
+        .upsertSettings(
+          payload
+        );
 
     const updatedSettings =
-      await adminSettingsModel.getSettings();
+      await adminSettingsModel
+        .getSettings();
 
     return res.json({
       success: true,
-      message: "Admin settings updated successfully",
-      updated: result.updated,
-      settings: updatedSettings
+      message:
+        "Admin settings updated successfully",
+      updated:
+        result.updated,
+      settings:
+        updatedSettings
     });
   } catch (err) {
-    console.error("❌ updateAdminSettings error:", err);
+    console.error(
+      "❌ updateAdminSettings error:",
+      err
+    );
 
-    return res.status(500).json({
-      success: false,
-      message:
-        "Internal Server Error while updating admin settings"
-    });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message:
+          "Internal Server Error while updating admin settings"
+      });
   }
 };
 

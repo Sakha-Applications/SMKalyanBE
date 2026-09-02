@@ -319,6 +319,423 @@ class PreferredProfileModel {
     }
   }
   /**
+   * Browse active published advertisements with
+   * governed server-side filtering and pagination.
+   *
+   * This is deliberately separate from the public
+   * Dashboard Spotlight display contract.
+   */
+  static async browseAdvertisements({
+    page = 1,
+    limit = 6,
+    lookingFor = "",
+    minAge = null,
+    maxAge = null,
+    location = "",
+    qualification = "",
+    profession = "",
+    excludeGotra = ""
+  } = {}) {
+    try {
+      const parsedPage =
+        Math.max(
+          parseInt(page, 10) || 1,
+          1
+        );
+
+      const parsedLimit =
+        Math.min(
+          Math.max(
+            parseInt(limit, 10) || 6,
+            1
+          ),
+          24
+        );
+
+      const offset =
+        (parsedPage - 1) *
+        parsedLimit;
+
+      const where = [
+        "pp.status = 'active'",
+        "pp.preferred_flag = 1",
+        "pp.validity_date >= CURDATE()"
+      ];
+
+      const params = [];
+
+      const normalizedLookingFor =
+        String(
+          lookingFor || ""
+        )
+          .trim()
+          .toUpperCase();
+
+      if (
+        normalizedLookingFor ===
+          "BRIDE" ||
+        normalizedLookingFor ===
+          "BRIDEGROOM"
+      ) {
+        where.push(
+          "UPPER(TRIM(pp.looking_for)) = ?"
+        );
+        params.push(
+          normalizedLookingFor
+        );
+      }
+
+      const parsedMinAge =
+        Number(minAge);
+
+      if (
+        Number.isFinite(
+          parsedMinAge
+        ) &&
+        parsedMinAge > 0
+      ) {
+        where.push(
+          "p.current_age >= ?"
+        );
+        params.push(
+          Math.floor(
+            parsedMinAge
+          )
+        );
+      }
+
+      const parsedMaxAge =
+        Number(maxAge);
+
+      if (
+        Number.isFinite(
+          parsedMaxAge
+        ) &&
+        parsedMaxAge > 0
+      ) {
+        where.push(
+          "p.current_age <= ?"
+        );
+        params.push(
+          Math.floor(
+            parsedMaxAge
+          )
+        );
+      }
+
+      const addContainsFilter = (
+        value,
+        sqlExpression
+      ) => {
+        const normalized =
+          String(value || "")
+            .trim();
+
+        if (!normalized) {
+          return;
+        }
+
+        where.push(
+          `${sqlExpression} LIKE ?`
+        );
+        params.push(
+          `%${normalized}%`
+        );
+      };
+
+      addContainsFilter(
+        location,
+        `LOWER(
+          COALESCE(
+            p.current_city_of_residence,
+            p.current_location,
+            ''
+          )
+        )`
+      );
+
+      if (
+        String(location || "")
+          .trim()
+      ) {
+        params[
+          params.length - 1
+        ] =
+          `%${String(
+            location
+          )
+            .trim()
+            .toLowerCase()}%`;
+      }
+
+      addContainsFilter(
+        qualification,
+        `LOWER(
+          COALESCE(
+            p.qualification,
+            p.education,
+            ''
+          )
+        )`
+      );
+
+      if (
+        String(
+          qualification || ""
+        ).trim()
+      ) {
+        params[
+          params.length - 1
+        ] =
+          `%${String(
+            qualification
+          )
+            .trim()
+            .toLowerCase()}%`;
+      }
+
+      addContainsFilter(
+        profession,
+        `LOWER(
+          COALESCE(
+            p.professional_area,
+            p.profession,
+            p.designation,
+            ''
+          )
+        )`
+      );
+
+      if (
+        String(profession || "")
+          .trim()
+      ) {
+        params[
+          params.length - 1
+        ] =
+          `%${String(
+            profession
+          )
+            .trim()
+            .toLowerCase()}%`;
+      }
+
+      const normalizedExcludedGotra =
+        String(
+          excludeGotra || ""
+        ).trim();
+
+      if (
+        normalizedExcludedGotra
+      ) {
+        where.push(
+          `(
+            p.gotra IS NULL
+            OR TRIM(p.gotra) = ''
+            OR UPPER(TRIM(p.gotra)) <> UPPER(?)
+          )`
+        );
+
+        params.push(
+          normalizedExcludedGotra
+        );
+      }
+
+      const whereSql =
+        where.join(
+          "\n          AND "
+        );
+
+      const countQuery = `
+        SELECT
+          COUNT(*) AS total
+        FROM preferred_profiles pp
+        LEFT JOIN profile p
+          ON p.profile_id =
+             pp.profile_id
+        WHERE ${whereSql}
+      `;
+
+      const [countRows] =
+        await db.execute(
+          countQuery,
+          params
+        );
+
+      const total =
+        Number(
+          countRows?.[0]?.total ||
+          0
+        );
+
+      const dataQuery = `
+        SELECT
+          pp.id,
+          pp.profile_id,
+          pp.member_name,
+          pp.looking_for,
+
+          NULLIF(
+            pp.moderator_narrative,
+            ''
+          ) AS approved_advertisement_text,
+
+          pp.validity_date,
+
+          DATEDIFF(
+            pp.validity_date,
+            CURDATE()
+          ) AS days_remaining,
+
+          pp.updated_at,
+
+          COALESCE(
+            p.name,
+            pp.member_name,
+            'Matrimonial Profile'
+          ) AS name,
+
+          COALESCE(
+            p.current_age,
+            0
+          ) AS current_age,
+
+          COALESCE(
+            p.gotra,
+            'Not specified'
+          ) AS gotra,
+
+          COALESCE(
+            p.rashi,
+            'Not specified'
+          ) AS rashi,
+
+          COALESCE(
+            p.nakshatra,
+            'Not specified'
+          ) AS nakshatra,
+
+          COALESCE(
+            p.professional_area,
+            p.profession,
+            p.designation,
+            'Not specified'
+          ) AS profession,
+
+          COALESCE(
+            p.current_city_of_residence,
+            p.current_location,
+            'Not specified'
+          ) AS city,
+
+          COALESCE(
+            p.qualification,
+            p.education,
+            'Not specified'
+          ) AS education,
+
+          COALESCE(
+            p.height,
+            'Not specified'
+          ) AS height,
+
+          COALESCE(
+            p.mother_tongue,
+            'Not specified'
+          ) AS mother_tongue
+
+        FROM preferred_profiles pp
+
+        LEFT JOIN profile p
+          ON p.profile_id =
+             pp.profile_id
+
+        WHERE ${whereSql}
+
+        ORDER BY
+          pp.updated_at DESC,
+          pp.id DESC
+
+        LIMIT ?
+        OFFSET ?
+      `;
+
+      const [rows] =
+        await db.execute(
+          dataQuery,
+          [
+            ...params,
+            parsedLimit,
+            offset
+          ]
+        );
+
+      const advertisements =
+        rows.map(
+          (row) => ({
+            ...row,
+
+            display_summary:
+              row
+                .approved_advertisement_text &&
+              String(
+                row
+                  .approved_advertisement_text
+              ).trim()
+                ? row
+                    .approved_advertisement_text
+                : `${
+                    row.name ||
+                    row.member_name ||
+                    "Profile"
+                  } is a featured member looking for a life partner.`,
+
+            current_age:
+              parseInt(
+                row.current_age,
+                10
+              ) || 0,
+
+            profile_id:
+              row.profile_id ||
+              "",
+
+            name:
+              row.name ||
+              row.member_name ||
+              "Matrimonial Profile"
+          })
+        );
+
+      return {
+        advertisements,
+        meta: {
+          page:
+            parsedPage,
+          limit:
+            parsedLimit,
+          count:
+            advertisements.length,
+          total,
+          totalPages:
+            total > 0
+              ? Math.ceil(
+                  total /
+                    parsedLimit
+                )
+              : 0
+        }
+      };
+    } catch (error) {
+      console.error(
+        "[PreferredProfileModel] Error browsing advertisements:",
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
    * Get all advertisements belonging to one member.
    *
    * Includes historical advertisements and response

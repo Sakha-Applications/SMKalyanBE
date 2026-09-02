@@ -41,6 +41,11 @@ const advertisementResponseRoutes =
     "./routes/advertisementResponseRoutes"
   );
 
+const memberNotificationRoutes =
+  require(
+    "./routes/memberNotificationRoutes"
+  );
+
 const consultationFollowupRoutes =
   require(
     "./routes/consultationFollowupRoutes"
@@ -130,6 +135,10 @@ app.use('/api/preferred-profiles', preferredProfileRoutes);
 app.use(
   "/api/advertisement-responses",
   advertisementResponseRoutes
+);
+app.use(
+  "/api/member-notifications",
+  memberNotificationRoutes
 );
 app.use(
   "/api",

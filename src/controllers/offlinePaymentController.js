@@ -19,6 +19,9 @@ const adminSettingsModel =
 const creditModel =
     require('../models/creditModel');
 
+const MemberNotificationModel =
+    require('../models/memberNotificationModel');
+
 // Handle submission of offline payment details
 const submitOfflinePayment = async (req, res) => {
     try {
@@ -421,6 +424,43 @@ const updateOfflinePaymentStatus = async (req, res) => {
                     throw new Error(
                         `No matching advertisement found for profile ${paymentRow.profile_id} and payment reference ${paymentRow.payment_reference}`
                     );
+                }
+
+                if (status === 'rejected') {
+                    try {
+                        await MemberNotificationModel
+                            .createNotification({
+                                profileId:
+                                    paymentRow.profile_id,
+                                notificationType:
+                                    'ADVERTISEMENT_PAYMENT_REJECTED',
+                                category:
+                                    'ADMIN',
+                                title:
+                                    'Advertisement Payment Rejected',
+                                message:
+                                    String(
+                                        adminNotes ||
+                                        'The advertisement payment could not be verified. Please review the payment details and submit again.'
+                                    ).trim(),
+                                referenceType:
+                                    'ADVERTISEMENT_PAYMENT',
+                                referenceId:
+                                    String(paymentId),
+                                priority:
+                                    100,
+                                createdBy:
+                                    req.user?.email ||
+                                    req.user?.profile_id ||
+                                    req.user?.id ||
+                                    'ADMIN'
+                            });
+                    } catch (notificationError) {
+                        console.error(
+                            '⚠️ Payment rejection saved, but member notification could not be created:',
+                            notificationError.message
+                        );
+                    }
                 }
             }
 
