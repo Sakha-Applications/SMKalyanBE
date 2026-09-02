@@ -447,7 +447,6 @@ class PreferredProfileModel {
         location,
         `LOWER(
           COALESCE(
-            p.current_city_of_residence,
             p.current_location,
             ''
           )
@@ -472,7 +471,6 @@ class PreferredProfileModel {
         qualification,
         `LOWER(
           COALESCE(
-            p.qualification,
             p.education,
             ''
           )
@@ -498,7 +496,6 @@ class PreferredProfileModel {
         profession,
         `LOWER(
           COALESCE(
-            p.professional_area,
             p.profession,
             p.designation,
             ''
@@ -616,20 +613,17 @@ class PreferredProfileModel {
           ) AS nakshatra,
 
           COALESCE(
-            p.professional_area,
             p.profession,
             p.designation,
             'Not specified'
           ) AS profession,
 
           COALESCE(
-            p.current_city_of_residence,
             p.current_location,
             'Not specified'
           ) AS city,
 
           COALESCE(
-            p.qualification,
             p.education,
             'Not specified'
           ) AS education,
@@ -656,18 +650,14 @@ class PreferredProfileModel {
           pp.updated_at DESC,
           pp.id DESC
 
-        LIMIT ?
-        OFFSET ?
+        LIMIT ${parsedLimit}
+        OFFSET ${offset}
       `;
 
       const [rows] =
         await db.execute(
           dataQuery,
-          [
-            ...params,
-            parsedLimit,
-            offset
-          ]
+          params
         );
 
       const advertisements =
