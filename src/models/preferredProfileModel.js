@@ -1178,7 +1178,8 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
   static async updateAdvertisementPaymentStatus({
     profileId,
     paymentReference,
-    paymentStatus
+    paymentStatus,
+    rejectionReason = null
   }) {
     const normalized =
       String(paymentStatus || "")
@@ -1211,6 +1212,12 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
             review_status = ?,
             status = ?,
             preferred_flag = 0,
+            moderator_remarks =
+              CASE
+                WHEN ? = 'REJECTED'
+                  THEN ?
+                ELSE moderator_remarks
+              END,
             updated_at = CURRENT_TIMESTAMP
           WHERE profile_id = ?
             AND payment_reference = ?
@@ -1220,6 +1227,8 @@ static async getPreferredProfilesForDisplay(limit = 10, format = 'ticker') {
           normalized,
           reviewStatus,
           status,
+          normalized,
+          rejectionReason || null,
           profileId,
           paymentReference
         ]

@@ -409,7 +409,12 @@ const updateOfflinePaymentStatus = async (req, res) => {
                             paymentStatus:
                                 status === 'verified'
                                     ? 'APPROVED'
-                                    : 'REJECTED'
+                                    : 'REJECTED',
+
+                            rejectionReason:
+                                status === 'rejected'
+                                    ? adminNotes
+                                    : null
                         });
 
                 if (!advertisementUpdated) {
